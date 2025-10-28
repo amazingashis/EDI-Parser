@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EDI 837 (5010) Parser - X222/X223/X224 Compatible</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .file-upload-zone {
+            border: 2px dashed #dee2e6;
+            border-radius: 8px;
+            padding: 40px;
+            text-align: center;
+            transition: border-color 0.3s ease;
+            background-color: #f8f9fa;
+        }
+        .file-upload-zone:hover {
+            border-color: #0d6efd;
+            background-color: #e7f1ff;
+        }
+        .file-upload-zone.dragover {
+            border-color: #0d6efd;
+            background-color: #e7f1ff;
+        }
+        .results-section {
+            display: none;
+        }
+        .segment-table {
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+        .error-alert {
+            display: none;
+        }
+        .loading {
+            display: none;
+        }
+        .nav-tabs .nav-link {
+            color: #6c757d;
+        }
+        .nav-tabs .nav-link.active {
+            color: #0d6efd;
+            font-weight: 500;
+        }
+        .table-responsive {
+            max-height: 600px;
+            overflow-y: auto;
+        }
+        .badge-section {
+            font-size: 0.8em;
+        }
+        .code-snippet {
+            background-color: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 4px;
+            padding: 10px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container py-4">
+        <!-- Header -->
+        <div class="row mb-4">
+            <div class="col">
+                <h1 class="display-4 text-primary">
+                    <i class="fas fa-file-medical"></i> EDI 837 Parser
+                </h1>
+                <p class="lead text-muted">
+                    Health Care Claim (5010) Parser - Compatible with X222/X223/X224
+                </p>
+            </div>
+        </div>
+
+        <!-- Upload Section -->
+        <div class="row mb-4">
+            <div class="col">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-upload"></i> Upload EDI File or Paste Content
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <!-- File Upload -->
+                        <div class="mb-4">
+                            <h6>Upload EDI File</h6>
+                            <div class="file-upload-zone" id="uploadZone">
+                                <i class="fas fa-cloud-upload-alt fa-3x text-muted mb-3"></i>
+                                <p class="mb-2">Drop your EDI file here or click to browse</p>
+                                <p class="text-muted small">Supports .txt, .edi, .x12, .837 files (max 16MB)</p>
+                                <input type="file" id="fileInput" class="d-none" accept=".txt,.edi,.x12,.837">
+                            </div>
+                        </div>
+
+                        <!-- Text Input -->
+                        <div class="mb-3">
+                            <h6>Or Paste EDI Content</h6>
+                            <textarea class="form-control" id="ediContent" rows="6" 
+                                placeholder="Paste your EDI 837 content here..."></textarea>
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div class="d-flex gap-2">
+                            <button type="button" class="btn btn-primary" id="parseBtn">
+                                <i class="fas fa-cogs"></i> Parse EDI
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary" id="sampleBtn">
+                                <i class="fas fa-eye"></i> Load Sample
+                            </button>
+                            <button type="button" class="btn btn-outline-danger" id="clearBtn">
+                                <i class="fas fa-trash"></i> Clear
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Loading -->
+        <div class="text-center loading" id="loading">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-2">Parsing EDI file...</p>
+        </div>
+
+        <!-- Error Alert -->
+        <div class="alert alert-danger error-alert" id="errorAlert">
+            <h6><i class="fas fa-exclamation-triangle"></i> Error</h6>
+            <div id="errorMessage"></div>
+        </div>
+
+        <!-- Results Section -->
+        <div class="results-section" id="resultsSection">
+            <div class="row">
+                <div class="col">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">
+                                <i class="fas fa-table"></i> Parsed Results
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <!-- Navigation Tabs -->
+                            <ul class="nav nav-tabs mb-3" id="resultTabs" role="tablist">
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link active" id="summary-tab" data-bs-toggle="tab" 
+                                        data-bs-target="#summary" type="button" role="tab">
+                                        <i class="fas fa-list"></i> Summary
+                                    </button>
+                                </li>
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link" id="segments-tab" data-bs-toggle="tab" 
+                                        data-bs-target="#segments" type="button" role="tab">
+                                        <i class="fas fa-code"></i> Segments
+                                    </button>
+                                </li>
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link" id="raw-tab" data-bs-toggle="tab" 
+                                        data-bs-target="#raw" type="button" role="tab">
+                                        <i class="fas fa-database"></i> Raw Data
+                                    </button>
+                                </li>
+                            </ul>
+
+                            <!-- Tab Content -->
+                            <div class="tab-content" id="resultTabContent">
+                                <!-- Summary Tab -->
+                                <div class="tab-pane fade show active" id="summary" role="tabpanel">
+                                    <div class="table-responsive">
+                                        <table class="table table-striped table-hover" id="summaryTable">
+                                            <thead class="table-dark">
+                                                <tr>
+                                                    <th>Section</th>
+                                                    <th>Field</th>
+                                                    <th>Value</th>
+                                                    <th>Description</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody></tbody>
+                                        </table>
+                                    </div>
+                                </div>
+
+                                <!-- Segments Tab -->
+                                <div class="tab-pane fade" id="segments" role="tabpanel">
+                                    <div class="table-responsive">
+                                        <table class="table table-striped segment-table" id="segmentsTable">
+                                            <thead class="table-dark">
+                                                <tr>
+                                                    <th>Segment</th>
+                                                    <th>Description</th>
+                                                    <th>Elements</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody></tbody>
+                                        </table>
+                                    </div>
+                                </div>
+
+                                <!-- Raw Data Tab -->
+                                <div class="tab-pane fade" id="raw" role="tabpanel">
+                                    <div class="code-snippet" id="rawData"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="mt-5 pt-4 border-top">
+            <div class="row">
+                <div class="col">
+                    <p class="text-muted text-center">
+                        <i class="fas fa-info-circle"></i> 
+                        EDI 837 Health Care Claim Parser - Supports X222, X223, X224 versions
+                    </p>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // DOM elements
+        const uploadZone = document.getElementById('uploadZone');
+        const fileInput = document.getElementById('fileInput');
+        const ediContent = document.getElementById('ediContent');
+        const parseBtn = document.getElementById('parseBtn');
+        const sampleBtn = document.getElementById('sampleBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const loading = document.getElementById('loading');
+        const errorAlert = document.getElementById('errorAlert');
+        const errorMessage = document.getElementById('errorMessage');
+        const resultsSection = document.getElementById('resultsSection');
+        const summaryTable = document.getElementById('summaryTable').getElementsByTagName('tbody')[0];
+        const segmentsTable = document.getElementById('segmentsTable').getElementsByTagName('tbody')[0];
+        const rawData = document.getElementById('rawData');
+
+        // File upload handling
+        uploadZone.addEventListener('click', () => fileInput.click());
+        uploadZone.addEventListener('dragover', handleDragOver);
+        uploadZone.addEventListener('dragleave', handleDragLeave);
+        uploadZone.addEventListener('drop', handleDrop);
+        fileInput.addEventListener('change', handleFileSelect);
+
+        function handleDragOver(e) {
+            e.preventDefault();
+            uploadZone.classList.add('dragover');
+        }
+
+        function handleDragLeave(e) {
+            e.preventDefault();
+            uploadZone.classList.remove('dragover');
+        }
+
+        function handleDrop(e) {
+            e.preventDefault();
+            uploadZone.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        }
+
+        function handleFileSelect(e) {
+            const file = e.target.files[0];
+            if (file) {
+                handleFile(file);
+            }
+        }
+
+        function handleFile(file) {
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            showLoading();
+            hideError();
+            
+            fetch('/upload', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                hideLoading();
+                if (data.success) {
+                    displayResults(data);
+                } else {
+                    showError(data.error || 'Failed to parse file');
+                }
+            })
+            .catch(error => {
+                hideLoading();
+                showError('Error uploading file: ' + error.message);
+            });
+        }
+
+        // Parse button handling
+        parseBtn.addEventListener('click', () => {
+            const content = ediContent.value.trim();
+            if (!content) {
+                showError('Please provide EDI content to parse');
+                return;
+            }
+            
+            showLoading();
+            hideError();
+            
+            fetch('/parse_text', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ content: content })
+            })
+            .then(response => response.json())
+            .then(data => {
+                hideLoading();
+                if (data.success) {
+                    displayResults(data);
+                } else {
+                    showError(data.error || 'Failed to parse EDI content');
+                }
+            })
+            .catch(error => {
+                hideLoading();
+                showError('Error parsing content: ' + error.message);
+            });
+        });
+
+        // Sample button handling
+        sampleBtn.addEventListener('click', () => {
+            showLoading();
+            hideError();
+            
+            fetch('/sample')
+            .then(response => response.json())
+            .then(data => {
+                hideLoading();
+                if (data.success) {
+                    ediContent.value = data.sample_content;
+                    displayResults(data);
+                } else {
+                    showError(data.error || 'Failed to load sample');
+                }
+            })
+            .catch(error => {
+                hideLoading();
+                showError('Error loading sample: ' + error.message);
+            });
+        });
+
+        // Clear button handling
+        clearBtn.addEventListener('click', () => {
+            ediContent.value = '';
+            fileInput.value = '';
+            hideResults();
+            hideError();
+        });
+
+        function displayResults(data) {
+            // Clear previous results
+            summaryTable.innerHTML = '';
+            segmentsTable.innerHTML = '';
+            rawData.textContent = '';
+
+            // Populate summary table
+            data.summary.forEach(item => {
+                const row = summaryTable.insertRow();
+                row.innerHTML = `
+                    <td><span class="badge bg-secondary badge-section">${item.Section}</span></td>
+                    <td><strong>${item.Field}</strong></td>
+                    <td><code>${item.Value}</code></td>
+                    <td>${item.Description}</td>
+                `;
+            });
+
+            // Populate segments table
+            data.segments.forEach(segment => {
+                const row = segmentsTable.insertRow();
+                row.innerHTML = `
+                    <td><span class="badge bg-primary">${segment.tag}</span></td>
+                    <td>${segment.description}</td>
+                    <td><small>${segment.elements.join(' | ')}</small></td>
+                `;
+            });
+
+            // Populate raw data
+            rawData.textContent = JSON.stringify(data.raw_data, null, 2);
+
+            showResults();
+        }
+
+        function showLoading() {
+            loading.style.display = 'block';
+            resultsSection.style.display = 'none';
+        }
+
+        function hideLoading() {
+            loading.style.display = 'none';
+        }
+
+        function showError(message) {
+            errorMessage.textContent = message;
+            errorAlert.style.display = 'block';
+            resultsSection.style.display = 'none';
+        }
+
+        function hideError() {
+            errorAlert.style.display = 'none';
+        }
+
+        function showResults() {
+            resultsSection.style.display = 'block';
+            errorAlert.style.display = 'none';
+        }
+
+        function hideResults() {
+            resultsSection.style.display = 'none';
+        }
+    </script>
+</body>
+</html>
