@@ -196,8 +196,42 @@
 
                                 <!-- Element Details Tab -->
                                 <div class="tab-pane fade" id="elements" role="tabpanel">
+                                    <div class="mb-3 d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <div class="btn-group" role="group" aria-label="View toggle">
+                                                <button class="btn btn-outline-primary btn-sm active" id="groupedViewBtn">Grouped View</button>
+                                                <button class="btn btn-outline-primary btn-sm" id="flattenedViewBtn">Flattened View</button>
+                                            </div>
+                                            <button class="btn btn-outline-secondary btn-sm ms-2" id="copyFlattenedBtn" title="Copy flattened table to clipboard">
+                                                <i class="fas fa-copy"></i> Copy
+                                            </button>
+                                            <button class="btn btn-outline-secondary btn-sm ms-1" id="exportCsvBtn" title="Export flattened table as CSV">
+                                                <i class="fas fa-file-csv"></i> CSV
+                                            </button>
+                                        </div>
+                                        <div class="text-muted small">Toggle between grouped segment details and a flattened, spreadsheet-like view</div>
+                                    </div>
+
+                                    <!-- Flattened table (hidden by default) -->
+                                    <div id="flattenedWrapper" class="table-responsive d-none mb-3">
+                                        <table class="table table-sm table-striped" id="flattenedTable">
+                                            <thead class="table-dark">
+                                                <tr>
+                                                    <th>Segment</th>
+                                                    <th>Pos</th>
+                                                    <th>Element Name</th>
+                                                    <th>Value</th>
+                                                    <th>Interpreted</th>
+                                                    <th>Description</th>
+                                                    <th>Present</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody></tbody>
+                                        </table>
+                                    </div>
+
                                     <div id="elementsContent">
-                                        <!-- Dynamic content will be inserted here -->
+                                        <!-- Dynamic grouped content will be inserted here -->
                                     </div>
                                 </div>
 
@@ -385,6 +419,8 @@
             summaryTable.innerHTML = '';
             segmentsTable.innerHTML = '';
             document.getElementById('elementsContent').innerHTML = '';
+            const flattenedTbody = document.querySelector('#flattenedTable tbody');
+            if (flattenedTbody) flattenedTbody.innerHTML = '';
             rawData.textContent = '';
 
             // Populate summary table
@@ -398,12 +434,31 @@
                 `;
             });
 
-            // Populate detailed elements
+            // Helper to build flattened rows
+            function buildFlattenedRows(detailedSegments) {
+                const rows = [];
+                detailedSegments.forEach(segment => {
+                    segment.elements.forEach(el => {
+                        rows.push({
+                            segment: segment.segment_tag,
+                            pos: el.position,
+                            name: el.name,
+                            value: el.value || '',
+                            interpreted: el.interpreted_value || '',
+                            description: el.description || '',
+                            present: el.is_present ? 'Yes' : 'No'
+                        });
+                    });
+                });
+                return rows;
+            }
+
+            // Populate detailed elements (grouped cards)
             if (data.detailed_segments) {
                 const elementsContent = document.getElementById('elementsContent');
                 data.detailed_segments.forEach(segment => {
                     const segmentDiv = document.createElement('div');
-                    segmentDiv.className = 'mb-4';
+                    segmentDiv.className = 'mb-4 grouped-segment';
                     
                     let elementsTableHTML = `
                         <div class="card">
@@ -465,6 +520,80 @@
                     segmentDiv.innerHTML = elementsTableHTML;
                     elementsContent.appendChild(segmentDiv);
                 });
+
+                // Build flattened rows and populate flattened table
+                const flattenedRows = buildFlattenedRows(data.detailed_segments);
+                const tbody = document.querySelector('#flattenedTable tbody');
+                if (tbody) {
+                    flattenedRows.forEach(r => {
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `
+                            <td><span class="badge bg-primary">${r.segment}</span></td>
+                            <td>${r.pos}</td>
+                            <td><strong>${r.name}</strong></td>
+                            <td><code>${r.value || ''}</code></td>
+                            <td><small class="text-success">${r.interpreted || ''}</small></td>
+                            <td><small>${r.description || ''}</small></td>
+                            <td>${r.present === 'Yes' ? '<span class="badge bg-success">Yes</span>' : '<span class="badge bg-secondary">No</span>'}</td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+                }
+
+                // Wire up copy/export/toggle behavior
+                const groupedBtn = document.getElementById('groupedViewBtn');
+                const flatBtn = document.getElementById('flattenedViewBtn');
+                const flatWrapper = document.getElementById('flattenedWrapper');
+                const groupedSegments = document.querySelectorAll('.grouped-segment');
+                const copyBtn = document.getElementById('copyFlattenedBtn');
+                const exportBtn = document.getElementById('exportCsvBtn');
+
+                function showGrouped() {
+                    flatWrapper.classList.add('d-none');
+                    groupedSegments.forEach(n => n.classList.remove('d-none'));
+                    groupedBtn.classList.add('active');
+                    flatBtn.classList.remove('active');
+                }
+
+                function showFlattened() {
+                    flatWrapper.classList.remove('d-none');
+                    groupedSegments.forEach(n => n.classList.add('d-none'));
+                    groupedBtn.classList.remove('active');
+                    flatBtn.classList.add('active');
+                }
+
+                groupedBtn.onclick = showGrouped;
+                flatBtn.onclick = showFlattened;
+
+                copyBtn.onclick = () => {
+                    // Copy flattened table as TSV to clipboard
+                    const rows = Array.from(document.querySelectorAll('#flattenedTable tr'));
+                    const tsv = rows.map(r => Array.from(r.querySelectorAll('th,td')).map(c => c.innerText.trim().replace(/\n/g,' ')).join('\t')).join('\n');
+                    navigator.clipboard.writeText(tsv).then(() => {
+                        copyBtn.innerHTML = '<i class="fas fa-check"></i> Copied';
+                        setTimeout(() => copyBtn.innerHTML = '<i class="fas fa-copy"></i> Copy', 1500);
+                    }).catch(() => alert('Unable to copy to clipboard'));
+                };
+
+                exportBtn.onclick = () => {
+                    // Export flattened table as CSV
+                    const rows = Array.from(document.querySelectorAll('#flattenedTable tbody tr'));
+                    const csv = ['Segment,Pos,Element Name,Value,Interpreted,Description,Present']
+                        .concat(rows.map(r => Array.from(r.querySelectorAll('td')).map(c => '"' + c.innerText.replace(/"/g,'""') + '"').join(',')))
+                        .join('\n');
+                    const blob = new Blob([csv], { type: 'text/csv' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'edi_flattened.csv';
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+                    URL.revokeObjectURL(url);
+                };
+
+                // Default view: grouped
+                showGrouped();
             }
 
             // Populate segments table
