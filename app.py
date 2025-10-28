@@ -56,6 +56,7 @@ def upload_file():
                 'success': True,
                 'summary': summary_table,
                 'segments': result['segments'],
+                'detailed_segments': result['detailed_segments'],
                 'raw_data': result['data'],
                 'filename': filename
             })
@@ -83,6 +84,7 @@ def parse_text():
             'success': True,
             'summary': summary_table,
             'segments': result['segments'],
+            'detailed_segments': result['detailed_segments'],
             'raw_data': result['data']
         })
     else:
@@ -106,6 +108,7 @@ def sample():
             'success': True,
             'summary': summary_table,
             'segments': result['segments'],
+            'detailed_segments': result['detailed_segments'],
             'raw_data': result['data'],
             'sample_content': sample_edi
         })

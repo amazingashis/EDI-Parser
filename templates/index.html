@@ -156,6 +156,12 @@
                                     </button>
                                 </li>
                                 <li class="nav-item" role="presentation">
+                                    <button class="nav-link" id="elements-tab" data-bs-toggle="tab" 
+                                        data-bs-target="#elements" type="button" role="tab">
+                                        <i class="fas fa-microscope"></i> Element Details
+                                    </button>
+                                </li>
+                                <li class="nav-item" role="presentation">
                                     <button class="nav-link" id="segments-tab" data-bs-toggle="tab" 
                                         data-bs-target="#segments" type="button" role="tab">
                                         <i class="fas fa-code"></i> Segments
@@ -185,6 +191,13 @@
                                             </thead>
                                             <tbody></tbody>
                                         </table>
+                                    </div>
+                                </div>
+
+                                <!-- Element Details Tab -->
+                                <div class="tab-pane fade" id="elements" role="tabpanel">
+                                    <div id="elementsContent">
+                                        <!-- Dynamic content will be inserted here -->
                                     </div>
                                 </div>
 
@@ -371,6 +384,7 @@
             // Clear previous results
             summaryTable.innerHTML = '';
             segmentsTable.innerHTML = '';
+            document.getElementById('elementsContent').innerHTML = '';
             rawData.textContent = '';
 
             // Populate summary table
@@ -383,6 +397,75 @@
                     <td>${item.Description}</td>
                 `;
             });
+
+            // Populate detailed elements
+            if (data.detailed_segments) {
+                const elementsContent = document.getElementById('elementsContent');
+                data.detailed_segments.forEach(segment => {
+                    const segmentDiv = document.createElement('div');
+                    segmentDiv.className = 'mb-4';
+                    
+                    let elementsTableHTML = `
+                        <div class="card">
+                            <div class="card-header">
+                                <h6 class="mb-0">
+                                    <span class="badge bg-primary me-2">${segment.segment_tag}</span>
+                                    ${segment.segment_name}
+                                    <small class="text-muted ms-2">(${segment.element_count} elements)</small>
+                                </h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-hover">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th style="width: 60px;">Pos</th>
+                                                <th style="width: 200px;">Element Name</th>
+                                                <th style="width: 150px;">Value</th>
+                                                <th>Description</th>
+                                                <th style="width: 80px;">Present</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>`;
+                    
+                    segment.elements.forEach(element => {
+                        const presentBadge = element.is_present ? 
+                            '<span class="badge bg-success">Yes</span>' : 
+                            '<span class="badge bg-secondary">No</span>';
+                        
+                        const interpretedValue = element.interpreted_value ? 
+                            `<br><small class="text-success"><i class="fas fa-arrow-right"></i> ${element.interpreted_value}</small>` : '';
+                        
+                        elementsTableHTML += `
+                            <tr class="${element.is_present ? '' : 'table-light'}">
+                                <td><span class="badge bg-outline-secondary">${element.position}</span></td>
+                                <td><strong>${element.name}</strong></td>
+                                <td>
+                                    <code>${element.value || '(empty)'}</code>
+                                    ${interpretedValue}
+                                </td>
+                                <td><small>${element.description}</small></td>
+                                <td>${presentBadge}</td>
+                            </tr>`;
+                    });
+                    
+                    elementsTableHTML += `
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <div class="mt-2">
+                                    <small class="text-muted">
+                                        <strong>Raw Segment:</strong> 
+                                        <code>${segment.raw_segment}</code>
+                                    </small>
+                                </div>
+                            </div>
+                        </div>`;
+                    
+                    segmentDiv.innerHTML = elementsTableHTML;
+                    elementsContent.appendChild(segmentDiv);
+                });
+            }
 
             // Populate segments table
             data.segments.forEach(segment => {

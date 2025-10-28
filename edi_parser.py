@@ -72,6 +72,89 @@ class EDI837Parser:
             '82': 'Rendering Provider'
         }
         
+        # Detailed element definitions for each segment
+        self.element_definitions = {
+            'ISA': [
+                {'pos': '01', 'name': 'Authorization Information Qualifier', 'description': 'Code to identify the type of information in the Authorization Information'},
+                {'pos': '02', 'name': 'Authorization Information', 'description': 'Information used for additional identification or authorization'},
+                {'pos': '03', 'name': 'Security Information Qualifier', 'description': 'Code to identify the type of information in the Security Information'},
+                {'pos': '04', 'name': 'Security Information', 'description': 'Information used for identifying the security information about the interchange sender'},
+                {'pos': '05', 'name': 'Interchange ID Qualifier', 'description': 'Qualifier to designate the system/method of code structure used to designate the sender'},
+                {'pos': '06', 'name': 'Interchange Sender ID', 'description': 'Identification code published by the sender for other parties to use'},
+                {'pos': '07', 'name': 'Interchange ID Qualifier', 'description': 'Qualifier to designate the system/method of code structure used to designate the receiver'},
+                {'pos': '08', 'name': 'Interchange Receiver ID', 'description': 'Identification code published by the receiver for other parties to use'},
+                {'pos': '09', 'name': 'Interchange Date', 'description': 'Date of the interchange'},
+                {'pos': '10', 'name': 'Interchange Time', 'description': 'Time of the interchange'},
+                {'pos': '11', 'name': 'Repetition Separator', 'description': 'Type is not applicable; the repetition separator is a delimiter'},
+                {'pos': '12', 'name': 'Interchange Control Version Number', 'description': 'Code specifying the version number of the interchange control structure'},
+                {'pos': '13', 'name': 'Interchange Control Number', 'description': 'A control number assigned by the interchange sender'},
+                {'pos': '14', 'name': 'Acknowledgment Requested', 'description': 'Code sent by the sender to request an interchange acknowledgment'},
+                {'pos': '15', 'name': 'Interchange Usage Indicator', 'description': 'Code to indicate whether data enclosed by this interchange envelope is test, production or information'}
+            ],
+            'GS': [
+                {'pos': '01', 'name': 'Functional ID Code', 'description': 'Code identifying a group of application related transaction sets'},
+                {'pos': '02', 'name': 'Application Sender Code', 'description': 'Code identifying party sending transmission'},
+                {'pos': '03', 'name': 'Application Receiver Code', 'description': 'Code identifying party receiving transmission'},
+                {'pos': '04', 'name': 'Date', 'description': 'Date expressed as CCYYMMDD'},
+                {'pos': '05', 'name': 'Time', 'description': 'Time expressed in 24-hour clock time as follows: HHMM, or HHMMSS, or HHMMSSD, or HHMMSSDD'},
+                {'pos': '06', 'name': 'Group Control Number', 'description': 'Assigned number originated and maintained by the sender'},
+                {'pos': '07', 'name': 'Responsible Agency Code', 'description': 'Code used to identify the issuer of the standard'},
+                {'pos': '08', 'name': 'Version / Release / Industry ID Code', 'description': 'Code indicating the version, release, subrelease, and industry identifier'}
+            ],
+            'ST': [
+                {'pos': '01', 'name': 'Transaction Set ID Code', 'description': 'Code uniquely identifying a Transaction Set'},
+                {'pos': '02', 'name': 'Transaction Set Control Number', 'description': 'Identifying control number that must be unique within the transaction set functional group'},
+                {'pos': '03', 'name': 'Implementation Convention Reference', 'description': 'Reference assigned to identify a specific implementation convention'}
+            ],
+            'BHT': [
+                {'pos': '01', 'name': 'Hierarchical Structure Code', 'description': 'Code indicating the hierarchical application structure of a transaction set'},
+                {'pos': '02', 'name': 'Transaction Set Purpose Code', 'description': 'Code identifying purpose of transaction set'},
+                {'pos': '03', 'name': 'Reference Identification', 'description': 'Reference information as defined for a particular Transaction Set'},
+                {'pos': '04', 'name': 'Date', 'description': 'Date expressed as CCYYMMDD'},
+                {'pos': '05', 'name': 'Time', 'description': 'Time expressed in 24-hour clock time'},
+                {'pos': '06', 'name': 'Transaction Type Code', 'description': 'Code specifying the type of transaction'}
+            ],
+            'NM1': [
+                {'pos': '01', 'name': 'Entity ID Code', 'description': 'Code identifying an organizational entity, a physical location, property or an individual'},
+                {'pos': '02', 'name': 'Entity Type Qualifier', 'description': 'Code qualifying the entity'},
+                {'pos': '03', 'name': 'Name Last or Organization Name', 'description': 'Individual last name or organizational name'},
+                {'pos': '04', 'name': 'Name First', 'description': 'Individual first name'},
+                {'pos': '05', 'name': 'Name Middle', 'description': 'Individual middle name or initial'},
+                {'pos': '06', 'name': 'Name Prefix', 'description': 'Prefix to individual name'},
+                {'pos': '07', 'name': 'Name Suffix', 'description': 'Suffix to individual name'},
+                {'pos': '08', 'name': 'ID Code Qualifier', 'description': 'Code designating the system/method of code structure used for Identification Code'},
+                {'pos': '09', 'name': 'ID Code', 'description': 'Code identifying a party or other code'}
+            ],
+            'CLM': [
+                {'pos': '01', 'name': 'Claim Submitter Identifier', 'description': 'Unique claim identifier assigned by the claim submitter'},
+                {'pos': '02', 'name': 'Monetary Amount', 'description': 'Total claim charge amount'},
+                {'pos': '03', 'name': 'Claim Filing Indicator Code', 'description': 'Code identifying the type of claim'},
+                {'pos': '04', 'name': 'Non-Institutional Claim Type Code', 'description': 'Code identifying the type of claim for non-institutional providers'},
+                {'pos': '05', 'name': 'Health Care Service Location Information', 'description': 'Information about the location where healthcare services were provided'},
+                {'pos': '06', 'name': 'Provider Accept Assignment Code', 'description': 'Code indicating whether the provider accepts assignment'},
+                {'pos': '07', 'name': 'Assignment Claim Participation Code', 'description': 'Code indicating the provider participation in assignment'},
+                {'pos': '08', 'name': 'Benefits Assignment Certification Indicator', 'description': 'Code indicating benefits assignment certification'},
+                {'pos': '09', 'name': 'Release of Information Code', 'description': 'Code indicating the release of information'}
+            ],
+            'SV1': [
+                {'pos': '01', 'name': 'Procedure Code', 'description': 'Procedure code and modifiers'},
+                {'pos': '02', 'name': 'Monetary Amount', 'description': 'Line item charge amount'},
+                {'pos': '03', 'name': 'Unit of Measure Code', 'description': 'Code specifying the units in which a value is being expressed'},
+                {'pos': '04', 'name': 'Service Unit Count', 'description': 'Number of units of service'},
+                {'pos': '05', 'name': 'Place of Service Code', 'description': 'Code identifying the place where the service was performed'},
+                {'pos': '06', 'name': 'Service Type Code', 'description': 'Code identifying the type of service'},
+                {'pos': '07', 'name': 'Composite Diagnosis Code Pointer', 'description': 'Reference to diagnosis codes'}
+            ],
+            'HI': [
+                {'pos': '01', 'name': 'Health Care Code Information', 'description': 'Code information for health care diagnosis, procedure, etc.'}
+            ],
+            'DTP': [
+                {'pos': '01', 'name': 'Date Time Qualifier', 'description': 'Code specifying type of date or time or both date and time'},
+                {'pos': '02', 'name': 'Date Time Period Format Qualifier', 'description': 'Code indicating the date format, time format, or date and time format'},
+                {'pos': '03', 'name': 'Date Time Period', 'description': 'Expression of a date, a time, or range of dates, times or dates and times'}
+            ]
+        }
+        
     def parse_file(self, file_content: str) -> Dict[str, Any]:
         """Parse EDI 837 file content"""
         try:
@@ -96,7 +179,8 @@ class EDI837Parser:
             return {
                 'success': True,
                 'data': self.parsed_data,
-                'segments': [{'tag': s.tag, 'elements': s.elements, 'description': self.segment_definitions.get(s.tag, 'Unknown')} for s in self.segments],
+                'segments': [self._parse_segment_elements(s) for s in self.segments],
+                'detailed_segments': [self._get_detailed_segment_info(s) for s in self.segments],
                 'errors': self.errors
             }
             
@@ -420,3 +504,134 @@ class EDI837Parser:
             })
         
         return summary
+
+    def _parse_segment_elements(self, segment: EDISegment) -> Dict[str, Any]:
+        """Parse segment elements with basic info"""
+        return {
+            'tag': segment.tag,
+            'elements': segment.elements,
+            'description': self.segment_definitions.get(segment.tag, 'Unknown segment'),
+            'raw': segment.raw
+        }
+
+    def _get_detailed_segment_info(self, segment: EDISegment) -> Dict[str, Any]:
+        """Get detailed element-level information for a segment"""
+        element_definitions = self.element_definitions.get(segment.tag, [])
+        
+        detailed_elements = []
+        for i, element_value in enumerate(segment.elements):
+            element_position = f"{i+1:02d}"  # Format as 01, 02, etc.
+            
+            # Find element definition
+            element_def = None
+            for definition in element_definitions:
+                if definition['pos'] == element_position:
+                    element_def = definition
+                    break
+            
+            if element_def:
+                element_info = {
+                    'position': element_position,
+                    'name': element_def['name'],
+                    'value': element_value,
+                    'description': element_def['description'],
+                    'is_present': bool(element_value.strip()) if element_value else False
+                }
+            else:
+                element_info = {
+                    'position': element_position,
+                    'name': f'Element {element_position}',
+                    'value': element_value,
+                    'description': 'Element definition not available',
+                    'is_present': bool(element_value.strip()) if element_value else False
+                }
+            
+            # Add special processing for certain elements
+            if segment.tag == 'ISA':
+                element_info = self._enhance_isa_element(element_position, element_value, element_info)
+            elif segment.tag == 'NM1':
+                element_info = self._enhance_nm1_element(element_position, element_value, element_info)
+            
+            detailed_elements.append(element_info)
+        
+        return {
+            'segment_tag': segment.tag,
+            'segment_name': self.segment_definitions.get(segment.tag, 'Unknown segment'),
+            'elements': detailed_elements,
+            'raw_segment': segment.raw,
+            'element_count': len(segment.elements)
+        }
+
+    def _enhance_isa_element(self, position: str, value: str, element_info: Dict[str, Any]) -> Dict[str, Any]:
+        """Enhance ISA segment elements with specific values"""
+        enhancements = {
+            '01': {  # Authorization Information Qualifier
+                '00': 'No Authorization Information Present (No Meaningful Information in I02)',
+                '03': 'Additional Data Identification'
+            },
+            '03': {  # Security Information Qualifier
+                '00': 'No Security Information Present (No Meaningful Information in I04)',
+                '01': 'Password'
+            },
+            '05': {  # Interchange ID Qualifier (Sender)
+                'ZZ': 'Mutually Defined',
+                '01': 'Duns (Dun & Bradstreet)',
+                '14': 'Duns Plus Suffix',
+                '20': 'Health Industry Number',
+                '27': 'Carrier Identification Number',
+                '28': 'Fiscal Intermediary Identification Number',
+                '29': 'Medicare Provider and Supplier Identification Number',
+                '30': 'U.S. Federal Tax Identification Number'
+            },
+            '07': {  # Interchange ID Qualifier (Receiver)
+                'ZZ': 'Mutually Defined',
+                '01': 'Duns (Dun & Bradstreet)',
+                '14': 'Duns Plus Suffix',
+                '20': 'Health Industry Number',
+                '27': 'Carrier Identification Number',
+                '28': 'Fiscal Intermediary Identification Number',
+                '29': 'Medicare Provider and Supplier Identification Number',
+                '30': 'U.S. Federal Tax Identification Number'
+            },
+            '12': {  # Interchange Control Version Number
+                '00501': 'Standards Approved for Publication by ASC X12 Procedures Review Board through October 2003'
+            },
+            '14': {  # Acknowledgment Requested
+                '0': 'No Interchange Acknowledgment Requested',
+                '1': 'Interchange Acknowledgment Requested'
+            },
+            '15': {  # Interchange Usage Indicator
+                'T': 'Test Data',
+                'P': 'Production Data',
+                'I': 'Information'
+            }
+        }
+        
+        if position in enhancements and value in enhancements[position]:
+            element_info['interpreted_value'] = enhancements[position][value]
+        
+        return element_info
+
+    def _enhance_nm1_element(self, position: str, value: str, element_info: Dict[str, Any]) -> Dict[str, Any]:
+        """Enhance NM1 segment elements with specific values"""
+        if position == '01' and value in self.entity_types:
+            element_info['interpreted_value'] = self.entity_types[value]
+        elif position == '02':
+            type_map = {
+                '1': 'Person',
+                '2': 'Non-Person Entity'
+            }
+            if value in type_map:
+                element_info['interpreted_value'] = type_map[value]
+        elif position == '08':
+            qualifier_map = {
+                'XX': 'Health Care Financing Administration National Provider Identifier',
+                'PI': 'Payor Identification',
+                'MI': 'Member Identification Number',
+                'EI': 'Employer Identification Number',
+                '46': 'Electronic Transmitter Identification Number'
+            }
+            if value in qualifier_map:
+                element_info['interpreted_value'] = qualifier_map[value]
+        
+        return element_info
