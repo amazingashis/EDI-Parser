@@ -4,13 +4,21 @@ A comprehensive EDI 837 Health Care Claim parser with web interface that support
 
 ## Features
 
-- **Complete EDI 837 (5010) Support**: Parses all major segments including ISA, GS, ST, BHT, NM1, CLM, etc.
-- **Version Compatibility**: Supports X222, X223, and X224 versions
-- **Human-Readable Output**: Displays parsed data in organized table format
-- **Web Interface**: Easy-to-use web application for file upload and parsing
-- **Multiple Input Methods**: File upload or direct text input
-- **Detailed Parsing**: Extracts provider, subscriber, patient, and claim information
-- **Error Handling**: Comprehensive error reporting and validation
+- ✅ **Full EDI 837 (5010) Support**: Parses professional health care claims
+- ✅ **Version Compatibility**: X222/X223/X224 support
+- ✅ **Advanced Web Interface**: Multiple view modes and visualization options
+- ✅ **Element-Level Parsing**: Detailed breakdown of each EDI element with positions and descriptions
+- ✅ **Multiple View Modes**: 
+  - **Summary View**: Key information in human-readable tables
+  - **Element Details**: Grouped segments with toggle to flattened spreadsheet view
+  - **Tree View**: Hierarchical structure with expandable nodes
+  - **Statistics**: Interactive charts and coverage metrics
+  - **Raw Data**: Complete JSON structure
+- ✅ **Advanced Search & Filtering**: Real-time search across all elements with segment and presence filters
+- ✅ **Visual Enhancements**: Color-coded segments, progress bars, and interactive charts
+- ✅ **Export Features**: Copy to clipboard or export flattened data as CSV
+- ✅ **Comprehensive Parsing**: Extracts all major segments and fields
+- ✅ **Error Handling**: Robust error detection and reporting
 
 ## Installation
 
@@ -22,21 +30,17 @@ pip install -r requirements.txt
 
 ## Usage
 
-### Running the Web Application
+### 3. Access the Enhanced Interface
+Open your browser and go to: http://localhost:5000
 
-1. Start the Flask server:
-```bash
-python app.py
-```
-
-2. Open your browser and go to `http://localhost:5000`
-
-3. Upload an EDI 837 file or paste EDI content directly
-
-4. View parsed results in organized tables:
-   - **Summary**: Key fields in human-readable format
-   - **Segments**: All EDI segments with descriptions
-   - **Raw Data**: Complete parsed data structure
+### 4. Explore the Visualization Features
+- **Summary Tab**: Overview of key EDI fields
+- **Element Details Tab**: 
+  - Toggle between grouped view (cards) and flattened view (table)
+  - Search and filter elements in real-time
+  - Copy data to clipboard or export as CSV
+- **Tree View Tab**: Navigate EDI structure hierarchically
+- **Statistics Tab**: View parsing coverage and segment distribution charts
 
 ### Using the Parser Directly
 
