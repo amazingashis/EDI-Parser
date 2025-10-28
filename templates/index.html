@@ -61,6 +61,42 @@
             max-height: 300px;
             overflow-y: auto;
         }
+        .segment-isa { background-color: rgba(255, 193, 7, 0.1); }
+        .segment-gs { background-color: rgba(25, 135, 84, 0.1); }
+        .segment-st { background-color: rgba(13, 110, 253, 0.1); }
+        .segment-bht { background-color: rgba(220, 53, 69, 0.1); }
+        .segment-nm1 { background-color: rgba(111, 66, 193, 0.1); }
+        .segment-clm { background-color: rgba(253, 126, 20, 0.1); }
+        .segment-sv1 { background-color: rgba(32, 201, 151, 0.1); }
+        .element-required { border-left: 3px solid #dc3545; }
+        .element-interpreted { background-color: rgba(25, 135, 84, 0.05); }
+        .stats-card { border-left: 4px solid #0d6efd; }
+        .highlight-search { background-color: yellow !important; }
+        .tree-container { font-family: monospace; }
+        .tree-node { margin-left: 20px; }
+        .tree-segment { 
+            cursor: pointer; 
+            padding: 5px; 
+            border-radius: 3px; 
+            margin: 2px 0;
+            background-color: #f8f9fa;
+            border-left: 3px solid #0d6efd;
+        }
+        .tree-segment:hover { background-color: #e9ecef; }
+        .tree-segment.collapsed .tree-elements { display: none; }
+        .tree-element { 
+            margin: 2px 0 2px 15px; 
+            padding: 3px 8px; 
+            font-size: 0.9em;
+            border-left: 2px solid #dee2e6;
+        }
+        .tree-element.present { border-left-color: #198754; }
+        .tree-toggle { 
+            width: 16px; 
+            display: inline-block; 
+            text-align: center;
+            font-size: 0.8em;
+        }
     </style>
 </head>
 <body>
@@ -168,6 +204,18 @@
                                     </button>
                                 </li>
                                 <li class="nav-item" role="presentation">
+                                    <button class="nav-link" id="tree-tab" data-bs-toggle="tab" 
+                                        data-bs-target="#tree" type="button" role="tab">
+                                        <i class="fas fa-sitemap"></i> Tree View
+                                    </button>
+                                </li>
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link" id="stats-tab" data-bs-toggle="tab" 
+                                        data-bs-target="#stats" type="button" role="tab">
+                                        <i class="fas fa-chart-bar"></i> Statistics
+                                    </button>
+                                </li>
+                                <li class="nav-item" role="presentation">
                                     <button class="nav-link" id="raw-tab" data-bs-toggle="tab" 
                                         data-bs-target="#raw" type="button" role="tab">
                                         <i class="fas fa-database"></i> Raw Data
@@ -212,6 +260,33 @@
                                         <div class="text-muted small">Toggle between grouped segment details and a flattened, spreadsheet-like view</div>
                                     </div>
 
+                                    <!-- Search and filter controls (for flattened view) -->
+                                    <div id="flattenedControls" class="mb-3 d-none">
+                                        <div class="row">
+                                            <div class="col-md-4">
+                                                <div class="input-group input-group-sm">
+                                                    <span class="input-group-text"><i class="fas fa-search"></i></span>
+                                                    <input type="text" class="form-control" id="searchInput" placeholder="Search elements...">
+                                                </div>
+                                            </div>
+                                            <div class="col-md-3">
+                                                <select class="form-select form-select-sm" id="segmentFilter">
+                                                    <option value="">All Segments</option>
+                                                </select>
+                                            </div>
+                                            <div class="col-md-3">
+                                                <select class="form-select form-select-sm" id="presentFilter">
+                                                    <option value="">All Elements</option>
+                                                    <option value="Yes">Present Only</option>
+                                                    <option value="No">Empty Only</option>
+                                                </select>
+                                            </div>
+                                            <div class="col-md-2">
+                                                <button class="btn btn-outline-secondary btn-sm w-100" id="clearFilters">Clear</button>
+                                            </div>
+                                        </div>
+                                    </div>
+
                                     <!-- Flattened table (hidden by default) -->
                                     <div id="flattenedWrapper" class="table-responsive d-none mb-3">
                                         <table class="table table-sm table-striped" id="flattenedTable">
@@ -251,6 +326,81 @@
                                     </div>
                                 </div>
 
+                                <!-- Tree View Tab -->
+                                <div class="tab-pane fade" id="tree" role="tabpanel">
+                                    <div class="card">
+                                        <div class="card-header">
+                                            <h6 class="mb-0">
+                                                <i class="fas fa-sitemap"></i> EDI Structure Hierarchy
+                                                <small class="text-muted ms-2">Click to expand/collapse segments</small>
+                                            </h6>
+                                        </div>
+                                        <div class="card-body">
+                                            <div id="treeView" class="tree-container"></div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Statistics Tab -->
+                                <div class="tab-pane fade" id="stats" role="tabpanel">
+                                    <div class="row mb-4">
+                                        <div class="col-md-3">
+                                            <div class="card stats-card">
+                                                <div class="card-body text-center">
+                                                    <h3 class="text-primary" id="totalSegments">0</h3>
+                                                    <small class="text-muted">Total Segments</small>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="card stats-card">
+                                                <div class="card-body text-center">
+                                                    <h3 class="text-success" id="totalElements">0</h3>
+                                                    <small class="text-muted">Total Elements</small>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="card stats-card">
+                                                <div class="card-body text-center">
+                                                    <h3 class="text-warning" id="presentElements">0</h3>
+                                                    <small class="text-muted">Elements with Data</small>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="card stats-card">
+                                                <div class="card-body text-center">
+                                                    <h3 class="text-info" id="coveragePercent">0%</h3>
+                                                    <small class="text-muted">Data Coverage</small>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <div class="card">
+                                                <div class="card-header">
+                                                    <h6 class="mb-0"><i class="fas fa-chart-pie"></i> Segment Distribution</h6>
+                                                </div>
+                                                <div class="card-body">
+                                                    <canvas id="segmentChart" width="300" height="200"></canvas>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="card">
+                                                <div class="card-header">
+                                                    <h6 class="mb-0"><i class="fas fa-chart-bar"></i> Element Usage</h6>
+                                                </div>
+                                                <div class="card-body">
+                                                    <div id="segmentDetails"></div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
                                 <!-- Raw Data Tab -->
                                 <div class="tab-pane fade" id="raw" role="tabpanel">
                                     <div class="code-snippet" id="rawData"></div>
@@ -276,6 +426,7 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
         // DOM elements
         const uploadZone = document.getElementById('uploadZone');
@@ -527,6 +678,8 @@
                 if (tbody) {
                     flattenedRows.forEach(r => {
                         const tr = document.createElement('tr');
+                        tr.className = `segment-${r.segment.toLowerCase()}`;
+                        if (r.interpreted) tr.classList.add('element-interpreted');
                         tr.innerHTML = `
                             <td><span class="badge bg-primary">${r.segment}</span></td>
                             <td>${r.pos}</td>
@@ -550,6 +703,7 @@
 
                 function showGrouped() {
                     flatWrapper.classList.add('d-none');
+                    document.getElementById('flattenedControls').classList.add('d-none');
                     groupedSegments.forEach(n => n.classList.remove('d-none'));
                     groupedBtn.classList.add('active');
                     flatBtn.classList.remove('active');
@@ -557,6 +711,7 @@
 
                 function showFlattened() {
                     flatWrapper.classList.remove('d-none');
+                    document.getElementById('flattenedControls').classList.remove('d-none');
                     groupedSegments.forEach(n => n.classList.add('d-none'));
                     groupedBtn.classList.remove('active');
                     flatBtn.classList.add('active');
@@ -564,6 +719,68 @@
 
                 groupedBtn.onclick = showGrouped;
                 flatBtn.onclick = showFlattened;
+
+                // Populate segment filter dropdown
+                const segmentFilter = document.getElementById('segmentFilter');
+                const uniqueSegments = [...new Set(flattenedRows.map(r => r.segment))];
+                uniqueSegments.forEach(seg => {
+                    const option = document.createElement('option');
+                    option.value = seg;
+                    option.textContent = seg;
+                    segmentFilter.appendChild(option);
+                });
+
+                // Search and filter functionality
+                function filterTable() {
+                    const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+                    const segmentValue = document.getElementById('segmentFilter').value;
+                    const presentValue = document.getElementById('presentFilter').value;
+                    const rows = document.querySelectorAll('#flattenedTable tbody tr');
+                    
+                    rows.forEach(row => {
+                        const cells = row.querySelectorAll('td');
+                        const segment = cells[0].textContent.trim();
+                        const elementName = cells[2].textContent.toLowerCase();
+                        const value = cells[3].textContent.toLowerCase();
+                        const interpreted = cells[4].textContent.toLowerCase();
+                        const description = cells[5].textContent.toLowerCase();
+                        const present = cells[6].textContent.trim();
+                        
+                        const matchesSearch = !searchTerm || 
+                            elementName.includes(searchTerm) ||
+                            value.includes(searchTerm) ||
+                            interpreted.includes(searchTerm) ||
+                            description.includes(searchTerm);
+                        
+                        const matchesSegment = !segmentValue || segment === segmentValue;
+                        const matchesPresent = !presentValue || present === presentValue;
+                        
+                        if (matchesSearch && matchesSegment && matchesPresent) {
+                            row.style.display = '';
+                            // Highlight search terms
+                            cells.forEach(cell => {
+                                if (searchTerm && cell.textContent.toLowerCase().includes(searchTerm)) {
+                                    cell.innerHTML = cell.innerHTML.replace(
+                                        new RegExp(`(${searchTerm})`, 'gi'),
+                                        '<mark class="highlight-search">$1</mark>'
+                                    );
+                                }
+                            });
+                        } else {
+                            row.style.display = 'none';
+                        }
+                    });
+                }
+
+                document.getElementById('searchInput').addEventListener('input', filterTable);
+                document.getElementById('segmentFilter').addEventListener('change', filterTable);
+                document.getElementById('presentFilter').addEventListener('change', filterTable);
+                document.getElementById('clearFilters').onclick = () => {
+                    document.getElementById('searchInput').value = '';
+                    document.getElementById('segmentFilter').value = '';
+                    document.getElementById('presentFilter').value = '';
+                    filterTable();
+                };
 
                 copyBtn.onclick = () => {
                     // Copy flattened table as TSV to clipboard
@@ -606,10 +823,129 @@
                 `;
             });
 
+            // Generate statistics
+            if (data.detailed_segments) {
+                generateStatistics(data.detailed_segments);
+                generateTreeView(data.detailed_segments);
+            }
+
             // Populate raw data
             rawData.textContent = JSON.stringify(data.raw_data, null, 2);
 
             showResults();
+        }
+
+        function generateStatistics(detailedSegments) {
+            // Calculate basic stats
+            const totalSegments = detailedSegments.length;
+            const totalElements = detailedSegments.reduce((sum, seg) => sum + seg.elements.length, 0);
+            const presentElements = detailedSegments.reduce((sum, seg) => 
+                sum + seg.elements.filter(el => el.is_present).length, 0);
+            const coverage = totalElements > 0 ? Math.round((presentElements / totalElements) * 100) : 0;
+
+            // Update stat cards
+            document.getElementById('totalSegments').textContent = totalSegments;
+            document.getElementById('totalElements').textContent = totalElements;
+            document.getElementById('presentElements').textContent = presentElements;
+            document.getElementById('coveragePercent').textContent = coverage + '%';
+
+            // Segment distribution chart
+            const segmentCounts = {};
+            detailedSegments.forEach(seg => {
+                segmentCounts[seg.segment_tag] = (segmentCounts[seg.segment_tag] || 0) + 1;
+            });
+
+            const ctx = document.getElementById('segmentChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: Object.keys(segmentCounts),
+                    datasets: [{
+                        data: Object.values(segmentCounts),
+                        backgroundColor: [
+                            '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0',
+                            '#9966FF', '#FF9F40', '#FF6384', '#C9CBCF',
+                            '#4BC0C0', '#FF6384', '#36A2EB', '#FFCE56'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+
+            // Segment details
+            const segmentDetails = document.getElementById('segmentDetails');
+            segmentDetails.innerHTML = '';
+            
+            detailedSegments.forEach(seg => {
+                const presentCount = seg.elements.filter(el => el.is_present).length;
+                const segCoverage = Math.round((presentCount / seg.elements.length) * 100);
+                
+                const segDiv = document.createElement('div');
+                segDiv.className = 'mb-2';
+                segDiv.innerHTML = `
+                    <div class="d-flex justify-content-between align-items-center">
+                        <small><strong>${seg.segment_tag}</strong> (${presentCount}/${seg.elements.length})</small>
+                        <small>${segCoverage}%</small>
+                    </div>
+                    <div class="progress" style="height: 8px;">
+                        <div class="progress-bar ${segCoverage > 75 ? 'bg-success' : segCoverage > 50 ? 'bg-warning' : 'bg-danger'}" 
+                             style="width: ${segCoverage}%"></div>
+                    </div>
+                `;
+                segmentDetails.appendChild(segDiv);
+            });
+        }
+
+        function generateTreeView(detailedSegments) {
+            const treeView = document.getElementById('treeView');
+            treeView.innerHTML = '';
+
+            // Create tree structure
+            const treeHTML = `
+                <div class="tree-node">
+                    <div class="tree-segment" onclick="toggleNode(this)">
+                        <span class="tree-toggle">📄</span>
+                        <strong>EDI 837 Document</strong> 
+                        <small class="text-muted">(${detailedSegments.length} segments)</small>
+                        <div class="tree-elements">
+                            ${detailedSegments.map(seg => `
+                                <div class="tree-node">
+                                    <div class="tree-segment" onclick="toggleNode(this)">
+                                        <span class="tree-toggle">📋</span>
+                                        <span class="badge bg-primary">${seg.segment_tag}</span>
+                                        <strong>${seg.segment_name}</strong>
+                                        <small class="text-muted">(${seg.elements.length} elements)</small>
+                                        <div class="tree-elements">
+                                            ${seg.elements.map(el => `
+                                                <div class="tree-element ${el.is_present ? 'present' : ''}">
+                                                    <span class="tree-toggle">${el.is_present ? '✓' : '○'}</span>
+                                                    <strong>${el.position}</strong> ${el.name}
+                                                    ${el.value ? `<code>${el.value}</code>` : '<em>(empty)</em>'}
+                                                    ${el.interpreted_value ? `<br><small class="text-success ms-3">→ ${el.interpreted_value}</small>` : ''}
+                                                </div>
+                                            `).join('')}
+                                        </div>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            treeView.innerHTML = treeHTML;
+        }
+
+        function toggleNode(element) {
+            element.classList.toggle('collapsed');
         }
 
         function showLoading() {
