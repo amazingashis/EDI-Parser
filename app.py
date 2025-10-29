@@ -52,9 +52,11 @@ def upload_file():
         
         if result['success']:
             summary_table = parser.get_summary_table()
+            data_summary = parser.get_data_summary()
             return jsonify({
                 'success': True,
                 'summary': summary_table,
+                'data_summary': data_summary,
                 'segments': result['segments'],
                 'detailed_segments': result['detailed_segments'],
                 'raw_data': result['data'],
@@ -80,9 +82,11 @@ def parse_text():
     
     if result['success']:
         summary_table = parser.get_summary_table()
+        data_summary = parser.get_data_summary()
         return jsonify({
             'success': True,
             'summary': summary_table,
+            'data_summary': data_summary,
             'segments': result['segments'],
             'detailed_segments': result['detailed_segments'],
             'raw_data': result['data']
@@ -104,9 +108,11 @@ def sample():
     
     if result['success']:
         summary_table = parser.get_summary_table()
+        data_summary = parser.get_data_summary()
         return jsonify({
             'success': True,
             'summary': summary_table,
+            'data_summary': data_summary,
             'segments': result['segments'],
             'detailed_segments': result['detailed_segments'],
             'raw_data': result['data'],

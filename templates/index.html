@@ -97,6 +97,19 @@
             text-align: center;
             font-size: 0.8em;
         }
+        
+        .procedure-analysis {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        .procedure-analysis .badge.fs-6 {
+            font-size: 0.875rem !important;
+        }
+        
+        .procedure-analysis .fw-bold {
+            color: #0d6efd;
+        }
     </style>
 </head>
 <body>
@@ -343,6 +356,94 @@
 
                                 <!-- Statistics Tab -->
                                 <div class="tab-pane fade" id="stats" role="tabpanel">
+                                    <!-- Main Data Summary Cards -->
+                                    <div class="row mb-4">
+                                        <div class="col-md-12">
+                                            <h5 class="mb-3"><i class="fas fa-chart-line"></i> Data Summary Report</h5>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Key Metrics Row 1 -->
+                                    <div class="row mb-4">
+                                        <div class="col-md-2">
+                                            <div class="card stats-card">
+                                                <div class="card-body text-center">
+                                                    <h3 class="text-primary" id="claimsCount">0</h3>
+                                                    <small class="text-muted">Claims</small>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-2">
+                                            <div class="card stats-card">
+                                                <div class="card-body text-center">
+                                                    <h3 class="text-success" id="subscribersCount">0</h3>
+                                                    <small class="text-muted">Subscribers</small>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-2">
+                                            <div class="card stats-card">
+                                                <div class="card-body text-center">
+                                                    <h3 class="text-warning" id="providersCount">0</h3>
+                                                    <small class="text-muted">Providers</small>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-2">
+                                            <div class="card stats-card">
+                                                <div class="card-body text-center">
+                                                    <h3 class="text-info" id="patientsCount">0</h3>
+                                                    <small class="text-muted">Patients</small>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-2">
+                                            <div class="card stats-card">
+                                                <div class="card-body text-center">
+                                                    <h3 class="text-secondary" id="serviceLinesCount">0</h3>
+                                                    <small class="text-muted">Service Lines</small>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-2">
+                                            <div class="card stats-card">
+                                                <div class="card-body text-center">
+                                                    <h3 class="text-dark" id="segmentsCount">0</h3>
+                                                    <small class="text-muted">Segments</small>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Financial Summary Row -->
+                                    <div class="row mb-4">
+                                        <div class="col-md-4">
+                                            <div class="card stats-card border-success">
+                                                <div class="card-body text-center">
+                                                    <h4 class="text-success" id="totalClaimAmount">$0.00</h4>
+                                                    <small class="text-muted">Total Claim Amount</small>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="card stats-card border-info">
+                                                <div class="card-body text-center">
+                                                    <h4 class="text-info" id="totalServiceAmount">$0.00</h4>
+                                                    <small class="text-muted">Total Service Amount</small>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="card stats-card border-warning">
+                                                <div class="card-body text-center">
+                                                    <h4 class="text-warning" id="avgClaimAmount">$0.00</h4>
+                                                    <small class="text-muted">Average Claim Amount</small>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Technical Statistics Row -->
                                     <div class="row mb-4">
                                         <div class="col-md-3">
                                             <div class="card stats-card">
@@ -377,7 +478,9 @@
                                             </div>
                                         </div>
                                     </div>
-                                    <div class="row">
+
+                                    <!-- Charts and Details Row -->
+                                    <div class="row mb-4">
                                         <div class="col-md-6">
                                             <div class="card">
                                                 <div class="card-header">
@@ -395,6 +498,71 @@
                                                 </div>
                                                 <div class="card-body">
                                                     <div id="segmentDetails"></div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Procedure Financial Analysis Row -->
+                                    <div class="row mb-4">
+                                        <div class="col-md-6">
+                                            <div class="card h-100">
+                                                <div class="card-header bg-success text-white">
+                                                    <h6 class="mb-0"><i class="fas fa-dollar-sign me-2"></i>Top Procedures by Amount</h6>
+                                                </div>
+                                                <div class="card-body">
+                                                    <div id="topProceduresByAmount" class="procedure-analysis">
+                                                        <div class="text-center text-muted">
+                                                            <i class="fas fa-chart-line fa-2x mb-2"></i>
+                                                            <p>No data available</p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="card h-100">
+                                                <div class="card-header bg-info text-white">
+                                                    <h6 class="mb-0"><i class="fas fa-chart-bar me-2"></i>Top Procedures by Frequency</h6>
+                                                </div>
+                                                <div class="card-body">
+                                                    <div id="topProceduresByFrequency" class="procedure-analysis">
+                                                        <div class="text-center text-muted">
+                                                            <i class="fas fa-chart-bar fa-2x mb-2"></i>
+                                                            <p>No data available</p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Additional Details Row -->
+                                    <div class="row mb-4">
+                                        <div class="col-md-4">
+                                            <div class="card">
+                                                <div class="card-header">
+                                                    <h6 class="mb-0"><i class="fas fa-user-md"></i> Provider Types</h6>
+                                                </div>
+                                                <div class="card-body" id="providerTypes">
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="card">
+                                                <div class="card-header">
+                                                    <h6 class="mb-0"><i class="fas fa-procedures"></i> Top Procedures</h6>
+                                                </div>
+                                                <div class="card-body" id="topProcedures">
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="card">
+                                                <div class="card-header">
+                                                    <h6 class="mb-0"><i class="fas fa-file-medical"></i> Transaction Info</h6>
+                                                </div>
+                                                <div class="card-body" id="transactionInfo">
                                                 </div>
                                             </div>
                                         </div>
@@ -829,6 +997,11 @@
                 generateTreeView(data.detailed_segments);
             }
 
+            // Generate comprehensive data summary
+            if (data.data_summary) {
+                populateDataSummary(data.data_summary);
+            }
+
             // Populate raw data
             rawData.textContent = JSON.stringify(data.raw_data, null, 2);
 
@@ -946,6 +1119,167 @@
 
         function toggleNode(element) {
             element.classList.toggle('collapsed');
+        }
+
+        function populateDataSummary(dataSummary) {
+            // Populate count cards
+            document.getElementById('claimsCount').textContent = dataSummary.counts.total_claims || 0;
+            document.getElementById('subscribersCount').textContent = dataSummary.counts.total_subscribers || 0;
+            document.getElementById('providersCount').textContent = dataSummary.counts.total_providers || 0;
+            document.getElementById('patientsCount').textContent = dataSummary.counts.total_patients || 0;
+            document.getElementById('serviceLinesCount').textContent = dataSummary.counts.total_service_lines || 0;
+            document.getElementById('segmentsCount').textContent = dataSummary.counts.total_segments || 0;
+
+            // Populate financial amounts
+            const formatCurrency = (amount) => new Intl.NumberFormat('en-US', {
+                style: 'currency',
+                currency: 'USD'
+            }).format(amount || 0);
+
+            document.getElementById('totalClaimAmount').textContent = formatCurrency(dataSummary.amounts.total_claim_amount);
+            document.getElementById('totalServiceAmount').textContent = formatCurrency(dataSummary.amounts.total_service_amount);
+            document.getElementById('avgClaimAmount').textContent = formatCurrency(dataSummary.amounts.average_claim_amount);
+
+            // Populate provider types
+            const providerTypesDiv = document.getElementById('providerTypes');
+            providerTypesDiv.innerHTML = '';
+            if (dataSummary.details.provider_types) {
+                Object.entries(dataSummary.details.provider_types).forEach(([type, count]) => {
+                    const div = document.createElement('div');
+                    div.className = 'mb-2';
+                    div.innerHTML = `
+                        <div class="d-flex justify-content-between">
+                            <small><strong>${type}</strong></small>
+                            <span class="badge bg-primary">${count}</span>
+                        </div>
+                    `;
+                    providerTypesDiv.appendChild(div);
+                });
+            }
+
+            // Populate top procedures
+            const topProceduresDiv = document.getElementById('topProcedures');
+            topProceduresDiv.innerHTML = '';
+            if (dataSummary.details.procedure_codes) {
+                const sortedProcedures = Object.entries(dataSummary.details.procedure_codes)
+                    .sort(([,a], [,b]) => b - a)
+                    .slice(0, 5);
+
+                sortedProcedures.forEach(([code, count]) => {
+                    const div = document.createElement('div');
+                    div.className = 'mb-2';
+                    div.innerHTML = `
+                        <div class="d-flex justify-content-between">
+                            <small><code>${code}</code></small>
+                            <span class="badge bg-success">${count}</span>
+                        </div>
+                    `;
+                    topProceduresDiv.appendChild(div);
+                });
+
+                // Add summary
+                const summaryDiv = document.createElement('div');
+                summaryDiv.className = 'mt-2 pt-2 border-top';
+                summaryDiv.innerHTML = `
+                    <small class="text-muted">
+                        <strong>Total:</strong> ${dataSummary.counts.unique_procedures || 0} unique procedures<br>
+                        <strong>Diagnoses:</strong> ${dataSummary.counts.unique_diagnoses || 0} unique codes
+                    </small>
+                `;
+                topProceduresDiv.appendChild(summaryDiv);
+            }
+
+            // Populate procedure analysis by amount
+            const topProceduresByAmountDiv = document.getElementById('topProceduresByAmount');
+            topProceduresByAmountDiv.innerHTML = '';
+            if (dataSummary.procedure_analysis && dataSummary.procedure_analysis.top_by_amount) {
+                dataSummary.procedure_analysis.top_by_amount.forEach(([code, data]) => {
+                    const avgAmount = data.count > 0 ? data.total_amount / data.count : 0;
+                    const div = document.createElement('div');
+                    div.className = 'mb-3 p-2 border rounded';
+                    div.innerHTML = `
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div class="flex-grow-1">
+                                <div class="fw-bold">${data.code_type}:${code}</div>
+                                <small class="text-muted">${data.description}</small>
+                                <div class="mt-1">
+                                    <small><strong>Count:</strong> ${data.count} | <strong>Avg:</strong> ${formatCurrency(avgAmount)}</small>
+                                </div>
+                            </div>
+                            <div class="text-end">
+                                <span class="badge bg-success fs-6">${formatCurrency(data.total_amount)}</span>
+                            </div>
+                        </div>
+                    `;
+                    topProceduresByAmountDiv.appendChild(div);
+                });
+            } else {
+                topProceduresByAmountDiv.innerHTML = `
+                    <div class="text-center text-muted">
+                        <i class="fas fa-chart-line fa-2x mb-2"></i>
+                        <p>No procedure amount data available</p>
+                    </div>
+                `;
+            }
+
+            // Populate procedure analysis by frequency
+            const topProceduresByFrequencyDiv = document.getElementById('topProceduresByFrequency');
+            topProceduresByFrequencyDiv.innerHTML = '';
+            if (dataSummary.procedure_analysis && dataSummary.procedure_analysis.top_by_frequency) {
+                dataSummary.procedure_analysis.top_by_frequency.forEach(([code, data]) => {
+                    const avgAmount = data.count > 0 ? data.total_amount / data.count : 0;
+                    const div = document.createElement('div');
+                    div.className = 'mb-3 p-2 border rounded';
+                    div.innerHTML = `
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div class="flex-grow-1">
+                                <div class="fw-bold">${data.code_type}:${code}</div>
+                                <small class="text-muted">${data.description}</small>
+                                <div class="mt-1">
+                                    <small><strong>Total:</strong> ${formatCurrency(data.total_amount)} | <strong>Avg:</strong> ${formatCurrency(avgAmount)}</small>
+                                </div>
+                            </div>
+                            <div class="text-end">
+                                <span class="badge bg-info fs-6">${data.count}x</span>
+                            </div>
+                        </div>
+                    `;
+                    topProceduresByFrequencyDiv.appendChild(div);
+                });
+            } else {
+                topProceduresByFrequencyDiv.innerHTML = `
+                    <div class="text-center text-muted">
+                        <i class="fas fa-chart-bar fa-2x mb-2"></i>
+                        <p>No procedure frequency data available</p>
+                    </div>
+                `;
+            }
+
+            // Populate transaction info
+            const transactionInfoDiv = document.getElementById('transactionInfo');
+            transactionInfoDiv.innerHTML = `
+                <div class="mb-2">
+                    <small class="text-muted">Sender:</small><br>
+                    <code>${dataSummary.details.sender_id || 'N/A'}</code>
+                </div>
+                <div class="mb-2">
+                    <small class="text-muted">Receiver:</small><br>
+                    <code>${dataSummary.details.receiver_id || 'N/A'}</code>
+                </div>
+                <div class="mb-2">
+                    <small class="text-muted">Date:</small><br>
+                    <code>${dataSummary.details.interchange_date || 'N/A'}</code>
+                </div>
+                <div class="mb-2">
+                    <small class="text-muted">Version:</small><br>
+                    <code>${dataSummary.details.version || 'N/A'}</code>
+                </div>
+                <div class="mt-2 pt-2 border-top">
+                    <small class="text-muted">
+                        <strong>Data Quality:</strong> ${Math.round(dataSummary.coverage.population_rate || 0)}% populated
+                    </small>
+                </div>
+            `;
         }
 
         function showLoading() {

@@ -505,6 +505,199 @@ class EDI837Parser:
         
         return summary
 
+    def get_data_summary(self) -> Dict[str, Any]:
+        """Generate comprehensive data summary for statistics display"""
+        # Common procedure code descriptions for reference
+        procedure_descriptions = {
+            # CPT Codes - Evaluation and Management
+            '99213': 'Office/Outpatient Visit - Est Patient (15 min)',
+            '99214': 'Office/Outpatient Visit - Est Patient (25 min)',
+            '99215': 'Office/Outpatient Visit - Est Patient (40 min)',
+            '99203': 'Office/Outpatient Visit - New Patient (30 min)',
+            '99204': 'Office/Outpatient Visit - New Patient (45 min)',
+            '99205': 'Office/Outpatient Visit - New Patient (60 min)',
+            '99212': 'Office/Outpatient Visit - Est Patient (10 min)',
+            '99211': 'Office/Outpatient Visit - Est Patient (5 min)',
+            
+            # Laboratory Tests
+            '85025': 'Complete Blood Count (CBC) with Differential',
+            '80053': 'Comprehensive Metabolic Panel',
+            '85027': 'Complete Blood Count (CBC)',
+            '36415': 'Venipuncture for Blood Collection',
+            '81001': 'Urinalysis',
+            '85610': 'Prothrombin Time (PT)',
+            '85730': 'Partial Thromboplastin Time (PTT)',
+            
+            # Radiology
+            '71020': 'Chest X-ray, 2 views',
+            '73060': 'Knee X-ray, 2 views',
+            '74177': 'CT Abdomen and Pelvis with Contrast',
+            '72148': 'MRI Lumbar Spine without Contrast',
+            '76700': 'Abdominal Ultrasound',
+            
+            # Procedures
+            '45378': 'Diagnostic Colonoscopy',
+            '43239': 'Upper Endoscopy (EGD)',
+            '12001': 'Simple Repair of Superficial Wounds',
+            '29881': 'Arthroscopy, Knee',
+            '58661': 'Laparoscopy, Surgical',
+            
+            # Preventive Care
+            'G0439': 'Annual Wellness Visit',
+            'G0438': 'Annual Wellness Visit - Initial',
+            'Q0091': 'Screening Papanicolaou Smear',
+            'G0202': 'Screening Mammography',
+            
+            # HCPCS Codes
+            'J3420': 'Injection, Vitamin B-12',
+            'A4253': 'Blood Glucose Test Strips',
+            'E0110': 'Crutches, Forearm',
+            'L3806': 'Wrist Hand Finger Orthosis',
+        }
+        
+        summary = {
+            'counts': {},
+            'amounts': {},
+            'details': {},
+            'coverage': {},
+            'procedure_analysis': {}
+        }
+        
+        # Count basic entities
+        summary['counts']['total_claims'] = len(self.parsed_data.get('claims', []))
+        summary['counts']['total_providers'] = len(self.parsed_data.get('providers', []))
+        summary['counts']['total_subscribers'] = len(self.parsed_data.get('subscribers', []))
+        summary['counts']['total_patients'] = len(self.parsed_data.get('patients', []))
+        summary['counts']['total_segments'] = len(self.segments)
+        
+        # Calculate financial amounts and procedure analysis
+        total_claim_amount = 0
+        total_service_amount = 0
+        service_lines_count = 0
+        procedure_amounts = {}  # Track amounts by procedure code
+        procedure_counts = {}   # Track frequency by procedure code
+        
+        for claim in self.parsed_data.get('claims', []):
+            # Claim amounts
+            if claim.get('claim_amount'):
+                try:
+                    total_claim_amount += float(claim['claim_amount'])
+                except (ValueError, TypeError):
+                    pass
+            
+            # Service line amounts and procedure analysis
+            for service in claim.get('service_lines', []):
+                service_lines_count += 1
+                charge_amount = 0
+                
+                if service.get('charge_amount'):
+                    try:
+                        charge_amount = float(service['charge_amount'])
+                        total_service_amount += charge_amount
+                    except (ValueError, TypeError):
+                        pass
+                
+                # Analyze procedure codes with amounts
+                proc_code = service.get('procedure_code', '')
+                if proc_code:
+                    # Extract code type and main code
+                    if ':' in proc_code:
+                        code_type, main_code = proc_code.split(':', 1)
+                    else:
+                        code_type = 'UNKNOWN'
+                        main_code = proc_code
+                    
+                    # Track procedure amounts and counts
+                    if main_code not in procedure_amounts:
+                        procedure_amounts[main_code] = {
+                            'total_amount': 0,
+                            'count': 0,
+                            'code_type': code_type,
+                            'description': procedure_descriptions.get(main_code, f'Procedure Code {main_code}')
+                        }
+                    
+                    procedure_amounts[main_code]['total_amount'] += charge_amount
+                    procedure_amounts[main_code]['count'] += 1
+                    procedure_counts[main_code] = procedure_counts.get(main_code, 0) + 1
+        
+        summary['amounts']['total_claim_amount'] = total_claim_amount
+        summary['amounts']['total_service_amount'] = total_service_amount
+        summary['amounts']['average_claim_amount'] = (
+            total_claim_amount / summary['counts']['total_claims'] 
+            if summary['counts']['total_claims'] > 0 else 0
+        )
+        summary['counts']['total_service_lines'] = service_lines_count
+        
+        # Enhanced procedure analysis
+        summary['procedure_analysis']['by_amount'] = procedure_amounts
+        summary['procedure_analysis']['total_procedures'] = len(procedure_amounts)
+        
+        # Top procedures by amount
+        top_by_amount = sorted(
+            procedure_amounts.items(), 
+            key=lambda x: x[1]['total_amount'], 
+            reverse=True
+        )[:10]
+        summary['procedure_analysis']['top_by_amount'] = top_by_amount
+        
+        # Top procedures by frequency
+        top_by_frequency = sorted(
+            procedure_amounts.items(), 
+            key=lambda x: x[1]['count'], 
+            reverse=True
+        )[:10]
+        summary['procedure_analysis']['top_by_frequency'] = top_by_frequency
+        
+        # Provider details
+        provider_types = {}
+        for provider in self.parsed_data.get('providers', []):
+            ptype = provider.get('entity_type_description', 'Unknown')
+            provider_types[ptype] = provider_types.get(ptype, 0) + 1
+        summary['details']['provider_types'] = provider_types
+        
+        # Service details (keeping original structure for compatibility)
+        diagnosis_codes = []
+        
+        for claim in self.parsed_data.get('claims', []):
+            # Diagnosis codes
+            for diag in claim.get('diagnosis_codes', []):
+                if diag.get('code'):
+                    diagnosis_codes.append(diag['code'])
+        
+        summary['details']['procedure_codes'] = procedure_counts
+        summary['details']['diagnosis_codes'] = list(set(diagnosis_codes))  # Unique codes
+        summary['counts']['unique_procedures'] = len(procedure_counts)
+        summary['counts']['unique_diagnoses'] = len(set(diagnosis_codes))
+        
+        # Transaction details
+        ic = self.parsed_data.get('interchange_control', {})
+        summary['details']['sender_id'] = ic.get('sender_id', '')
+        summary['details']['receiver_id'] = ic.get('receiver_id', '')
+        summary['details']['interchange_date'] = ic.get('date', '')
+        summary['details']['version'] = ic.get('version', '')
+        
+        # Segment analysis
+        segment_counts = {}
+        for segment in self.segments:
+            segment_counts[segment.tag] = segment_counts.get(segment.tag, 0) + 1
+        summary['details']['segment_distribution'] = segment_counts
+        
+        # Data quality metrics
+        total_elements = 0
+        populated_elements = 0
+        
+        for segment in self.segments:
+            total_elements += len(segment.elements)
+            populated_elements += sum(1 for el in segment.elements if el.strip())
+        
+        summary['coverage']['total_elements'] = total_elements
+        summary['coverage']['populated_elements'] = populated_elements
+        summary['coverage']['population_rate'] = (
+            (populated_elements / total_elements * 100) if total_elements > 0 else 0
+        )
+        
+        return summary
+
     def _parse_segment_elements(self, segment: EDISegment) -> Dict[str, Any]:
         """Parse segment elements with basic info"""
         return {
