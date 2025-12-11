@@ -1,7 +1,7 @@
 from flask import Flask, render_template, request, jsonify, redirect, url_for
 import os
 from werkzeug.utils import secure_filename
-from edi_parser import EDI837Parser
+from edi_parser import UniversalEDIParser
 import json
 
 app = Flask(__name__)
@@ -11,7 +11,7 @@ app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 # Create uploads directory if it doesn't exist
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
-ALLOWED_EXTENSIONS = {'txt', 'edi', 'x12', '837'}
+ALLOWED_EXTENSIONS = {'txt', 'edi', 'x12', '837', '820'}
 
 def allowed_file(filename):
     return '.' in filename and \
@@ -36,7 +36,7 @@ def upload_file():
         file.save(file_path)
         
         # Parse the EDI file
-        parser = EDI837Parser()
+        parser = UniversalEDIParser()
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
                 content = f.read()
@@ -55,6 +55,7 @@ def upload_file():
             data_summary = parser.get_data_summary()
             return jsonify({
                 'success': True,
+                'transaction_type': result.get('transaction_type', 'Unknown'),
                 'summary': summary_table,
                 'data_summary': data_summary,
                 'segments': result['segments'],
@@ -69,7 +70,7 @@ def upload_file():
                 'errors': result.get('errors', [])
             }), 400
     
-    return jsonify({'error': 'Invalid file type. Please upload .txt, .edi, .x12, or .837 files'}), 400
+    return jsonify({'error': 'Invalid file type. Please upload .txt, .edi, .x12, .837, or .820 files'}), 400
 
 @app.route('/parse_text', methods=['POST'])
 def parse_text():
@@ -77,7 +78,7 @@ def parse_text():
     if not data or 'content' not in data:
         return jsonify({'error': 'No EDI content provided'}), 400
     
-    parser = EDI837Parser()
+    parser = UniversalEDIParser()
     result = parser.parse_file(data['content'])
     
     if result['success']:
@@ -85,6 +86,7 @@ def parse_text():
         data_summary = parser.get_data_summary()
         return jsonify({
             'success': True,
+            'transaction_type': result.get('transaction_type', 'Unknown'),
             'summary': summary_table,
             'data_summary': data_summary,
             'segments': result['segments'],
@@ -103,7 +105,7 @@ def sample():
     """Provide a sample EDI 837 for testing"""
     sample_edi = """ISA*00*          *00*          *ZZ*SUBMITTER      *ZZ*RECEIVER       *101127*1719*^*00501*000000905*0*P*:~GS*HC*SUBMITTER*RECEIVER*20101127*1719*1*X*005010X222A1~ST*837*0001*005010X222A1~BHT*0019*00*244579*20061015*1023*CH~NM1*41*2*PREMIER BILLING SERVICE*****46*TGJ23~PER*IC*CONTACT NAME*TE*7176149999~NM1*40*2*KEY INSURANCE COMPANY*****46*66783JJT~HL*1**20*1~PRV*BI*PXC*203BF0100Y~NM1*85*2*BEN KILDARE SERVICE*****XX*9876543210~N3*234 SEAWAY ST~N4*MIAMI*FL*33111~REF*EI*587654321~HL*2*1*22*0~SBR*P*18*******CI~NM1*IL*1*SMITH*JANE****MI*JS00111223333~N3*236 N MAIN ST~N4*MIAMI*FL*33413~DMG*D8*19430501*F~NM1*PR*2*KEY INSURANCE COMPANY*****PI*999996666~CLM*26463774*100***11:B:1*Y*A*Y*I~DTP*431*D8*20061003~REF*D9*17312345600006351~HI*BK:0340*BF:V7389~LX*1~SV1*HC:99213*40*UN*1***1~DTP*472*D8*20061003~SE*23*0001~GE*1*1~IEA*1*000000905~"""
     
-    parser = EDI837Parser()
+    parser = UniversalEDIParser()
     result = parser.parse_file(sample_edi)
     
     if result['success']:
@@ -111,12 +113,40 @@ def sample():
         data_summary = parser.get_data_summary()
         return jsonify({
             'success': True,
+            'transaction_type': result.get('transaction_type', 'Unknown'),
             'summary': summary_table,
             'data_summary': data_summary,
             'segments': result['segments'],
             'detailed_segments': result['detailed_segments'],
             'raw_data': result['data'],
             'sample_content': sample_edi
+        })
+    else:
+        return jsonify({
+            'success': False,
+            'error': result.get('error', 'Unknown error')
+        }), 400
+
+@app.route('/sample820')
+def sample820():
+    """Provide a sample EDI 820 for testing"""
+    sample_edi_820 = """ISA*00*          *00*          *ZZ*PAYER          *ZZ*PROVIDER       *241205*1200*^*00501*000000001*0*P*:~GS*RA*PAYER*PROVIDER*20241205*1200*1*X*005010~ST*820*0001*005010~BPR*H*5000.00*C*ACH*CHK*01*123456789*DA*9876543210*PAYER123*SUP001~TRN*1*PAY2024120501*PAYER123*REF001~NM1*PR*2*HEALTH INSURANCE CO*****PI*PAYER123~N3*123 INSURANCE BLVD~N4*ANYTOWN*ST*12345~NM1*PE*2*MEDICAL GROUP PRACTICE*****XX*1234567890~N3*456 MEDICAL WAY~N4*ANYTOWN*ST*54321~DTM*405*20241205~RMR*EV*CLAIM001*3*1500.00*100.00*1300.00~DTM*232*20241201~SVC*HC:99213*150.00*135.00**1~CAS*CO*45*15.00~SVC*HC:85025*50.00*45.00**1~CAS*PR*1*5.00~RMR*EV*CLAIM002*3*2000.00*200.00*1700.00~DTM*232*20241202~SVC*HC:99214*200.00*180.00**1~CAS*CO*45*20.00~SVC*HC:71020*100.00*90.00**1~CAS*PR*2*10.00~PLB*1234567890*20241205*L6*ADJ001*-100.00~SE*20*0001~GE*1*1~IEA*1*000000001~"""
+    
+    parser = UniversalEDIParser()
+    result = parser.parse_file(sample_edi_820)
+    
+    if result['success']:
+        summary_table = parser.get_summary_table()
+        data_summary = parser.get_data_summary()
+        return jsonify({
+            'success': True,
+            'transaction_type': result.get('transaction_type', 'Unknown'),
+            'summary': summary_table,
+            'data_summary': data_summary,
+            'segments': result['segments'],
+            'detailed_segments': result['detailed_segments'],
+            'raw_data': result['data'],
+            'sample_content': sample_edi_820
         })
     else:
         return jsonify({

@@ -1,6 +1,7 @@
 """
-EDI 837 (5010) Parser
-Supports X222, X223, X224 versions
+Universal EDI Parser (5010)
+Supports EDI 837 (Healthcare Claims) and EDI 820 (Payment Order/Remittance Advice)
+Supports X222, X223, X224 versions for 837; 820 versions 5010
 """
 
 import re
@@ -15,19 +16,22 @@ class EDISegment:
     elements: List[str]
     raw: str
 
-class EDI837Parser:
+class UniversalEDIParser:
     """
-    EDI 837 Health Care Claim (5010) Parser
-    Supports X222/X223/X224 versions
+    Universal EDI Parser supporting multiple transaction types:
+    - EDI 837: Health Care Claims (X222/X223/X224 versions)
+    - EDI 820: Payment Order/Remittance Advice (5010)
     """
     
     def __init__(self):
         self.segments = []
         self.parsed_data = {}
         self.errors = []
+        self.transaction_type = None  # Will be determined during parsing
         
-        # EDI segment definitions for 837
+        # Universal EDI segment definitions (837 + 820)
         self.segment_definitions = {
+            # Common segments
             'ISA': 'Interchange Control Header',
             'GS': 'Functional Group Header',
             'ST': 'Transaction Set Header',
@@ -37,39 +41,80 @@ class EDI837Parser:
             'N4': 'Geographic Location',
             'REF': 'Reference Information',
             'PER': 'Administrative Communications Contact',
+            'DTP': 'Date or Time or Period',
+            'AMT': 'Monetary Amount Information',
+            'SE': 'Transaction Set Trailer',
+            'GE': 'Functional Group Trailer',
+            'IEA': 'Interchange Control Trailer',
+            
+            # EDI 837 specific segments
             'HL': 'Hierarchical Level',
             'PRV': 'Provider Information',
             'SBR': 'Subscriber Information',
             'PAT': 'Patient Information',
             'CLM': 'Claim Information',
-            'DTP': 'Date or Time or Period',
             'CL1': 'Institutional Claim Code',
             'PWK': 'Paperwork',
             'CN1': 'Contract Information',
-            'AMT': 'Monetary Amount Information',
             'HI': 'Health Care Diagnosis Code',
             'LX': 'Transaction Set Line Number',
             'SV1': 'Professional Service',
             'SV2': 'Institutional Service Line',
             'SV3': 'Dental Service',
             'DX': 'Diagnosis',
-            'SE': 'Transaction Set Trailer',
-            'GE': 'Functional Group Trailer',
-            'IEA': 'Interchange Control Trailer'
+            
+            # EDI 820 specific segments
+            'TRN': 'Trace',
+            'CUR': 'Currency',
+            'RMR': 'Remittance Advice',
+            'DTM': 'Date/Time Reference',
+            'N1': 'Name',
+            'N2': 'Additional Name Information',
+            'ENT': 'Entity',
+            'ADX': 'Adjustment',
+            'PLB': 'Provider Level Adjustment',
+            'SVC': 'Service Payment Information',
+            'CAS': 'Claims Adjustment',
+            'QTY': 'Quantity',
+            'LQ': 'Industry Code',
+            'FTX': 'Free Text',
+            'BPR': 'Beginning Segment for Payment Order/Remittance Advice',
+            'TED': 'Technical Error Description',
+            'SCH': 'Line Item Schedule'
         }
         
-        # Entity type codes for NM1 segments
+        # Entity type codes for NM1 segments (837 + 820)
         self.entity_types = {
+            # Common entity types
             '40': 'Receiver',
             '41': 'Submitter',
+            'PR': 'Payer',
+            
+            # EDI 837 specific entity types
             '85': 'Billing Provider',
             '87': 'Pay-to Provider',
             'IL': 'Insured or Subscriber',
             'QC': 'Patient',
-            'PR': 'Payer',
             'DN': 'Referring Provider',
             'P3': 'Primary Care Provider',
-            '82': 'Rendering Provider'
+            '82': 'Rendering Provider',
+            
+            # EDI 820 specific entity types
+            'PE': 'Payee',
+            'PR': 'Payer',
+            'TT': 'Third Party Administrator',
+            'GP': 'Group',
+            'BO': 'Broker or Sales Office',
+            'FA': 'Facility',
+            'LI': 'Limited Partner',
+            'GP': 'General Partner',
+            'SJ': 'Service Organization',
+            'PT': 'Patient',
+            'QD': 'Responsible Party',
+            'QN': 'Credit Recipient',
+            'TL': 'Training Location',
+            'VN': 'Vendor',
+            'X3': 'Dependent'
         }
         
         # Detailed element definitions for each segment
@@ -152,11 +197,63 @@ class EDI837Parser:
                 {'pos': '01', 'name': 'Date Time Qualifier', 'description': 'Code specifying type of date or time or both date and time'},
                 {'pos': '02', 'name': 'Date Time Period Format Qualifier', 'description': 'Code indicating the date format, time format, or date and time format'},
                 {'pos': '03', 'name': 'Date Time Period', 'description': 'Expression of a date, a time, or range of dates, times or dates and times'}
+            ],
+            # EDI 820 specific element definitions
+            'BPR': [
+                {'pos': '01', 'name': 'Transaction Handling Code', 'description': 'Code designating the action to be taken by all parties'},
+                {'pos': '02', 'name': 'Monetary Amount', 'description': 'Total payment amount'},
+                {'pos': '03', 'name': 'Credit/Debit Flag Code', 'description': 'Code indicating whether amount is credit or debit'},
+                {'pos': '04', 'name': 'Payment Method Code', 'description': 'Code identifying the payment method'},
+                {'pos': '05', 'name': 'Payment Format Code', 'description': 'Code identifying the payment format'},
+                {'pos': '06', 'name': 'DFI ID Number Qualifier', 'description': 'Code identifying the Depository Financial Institution'},
+                {'pos': '07', 'name': 'DFI Identification Number', 'description': 'Depository Financial Institution routing number'},
+                {'pos': '08', 'name': 'Account Number Qualifier', 'description': 'Code identifying the account number type'},
+                {'pos': '09', 'name': 'Account Number', 'description': 'Account number'},
+                {'pos': '10', 'name': 'Originating Company Identifier', 'description': 'Company identifier for ACH transactions'},
+                {'pos': '11', 'name': 'Originating Company Supplemental Code', 'description': 'Additional company identification'}
+            ],
+            'TRN': [
+                {'pos': '01', 'name': 'Trace Type Code', 'description': 'Code identifying the type of trace number'},
+                {'pos': '02', 'name': 'Reference Identification', 'description': 'Reference information for trace'},
+                {'pos': '03', 'name': 'Originating Company Identifier', 'description': 'Company that originated the trace'},
+                {'pos': '04', 'name': 'Reference Identification', 'description': 'Additional reference information'}
+            ],
+            'RMR': [
+                {'pos': '01', 'name': 'Reference Identification Qualifier', 'description': 'Code qualifying the reference identification'},
+                {'pos': '02', 'name': 'Reference Identification', 'description': 'Reference identification number'},
+                {'pos': '03', 'name': 'Payment Action Code', 'description': 'Code indicating the payment action'},
+                {'pos': '04', 'name': 'Monetary Amount', 'description': 'Payment amount'},
+                {'pos': '05', 'name': 'Monetary Amount', 'description': 'Adjustment amount'},
+                {'pos': '06', 'name': 'Monetary Amount', 'description': 'Outstanding balance'}
+            ],
+            'SVC': [
+                {'pos': '01', 'name': 'Product/Service ID Qualifier', 'description': 'Code identifying the product/service'},
+                {'pos': '02', 'name': 'Monetary Amount', 'description': 'Line item charge amount'},
+                {'pos': '03', 'name': 'Monetary Amount', 'description': 'Line item payment amount'},
+                {'pos': '04', 'name': 'Revenue Code', 'description': 'Revenue code for institutional claims'},
+                {'pos': '05', 'name': 'Quantity', 'description': 'Service quantity'},
+                {'pos': '06', 'name': 'Product/Service ID Qualifier', 'description': 'Bundled service identification'},
+                {'pos': '07', 'name': 'Quantity', 'description': 'Approved service quantity'}
+            ],
+            'CAS': [
+                {'pos': '01', 'name': 'Claim Adjustment Group Code', 'description': 'Code identifying the general category of adjustment'},
+                {'pos': '02', 'name': 'Claim Adjustment Reason Code', 'description': 'Code identifying the reason for adjustment'},
+                {'pos': '03', 'name': 'Monetary Amount', 'description': 'Adjustment amount'},
+                {'pos': '04', 'name': 'Quantity', 'description': 'Adjustment quantity'},
+                {'pos': '05', 'name': 'Claim Adjustment Reason Code', 'description': 'Second adjustment reason'},
+                {'pos': '06', 'name': 'Monetary Amount', 'description': 'Second adjustment amount'}
+            ],
+            'PLB': [
+                {'pos': '01', 'name': 'Reference Identification', 'description': 'Provider identifier'},
+                {'pos': '02', 'name': 'Date', 'description': 'Fiscal period end date'},
+                {'pos': '03', 'name': 'Reference Identification Qualifier', 'description': 'Adjustment identifier qualifier'},
+                {'pos': '04', 'name': 'Reference Identification', 'description': 'Provider adjustment number'},
+                {'pos': '05', 'name': 'Monetary Amount', 'description': 'Provider adjustment amount'}
             ]
         }
         
     def parse_file(self, file_content: str) -> Dict[str, Any]:
-        """Parse EDI 837 file content"""
+        """Parse EDI file content - supports both 837 and 820 transactions"""
         try:
             # Clean and split the content
             content = file_content.strip().replace('\n', '').replace('\r', '')
@@ -173,11 +270,18 @@ class EDI837Parser:
                 if segment_raw.strip():
                     self._parse_segment(segment_raw.strip())
             
+            # Detect transaction type from ST segment
+            self._detect_transaction_type()
+            
+            # Initialize data structure based on transaction type
+            self._initialize_data_structure()
+            
             # Extract structured data
             self._extract_structured_data()
             
             return {
                 'success': True,
+                'transaction_type': self.transaction_type,
                 'data': self.parsed_data,
                 'segments': [self._parse_segment_elements(s) for s in self.segments],
                 'detailed_segments': [self._get_detailed_segment_info(s) for s in self.segments],
@@ -212,21 +316,52 @@ class EDI837Parser:
         
         self.segments.append(segment)
     
-    def _extract_structured_data(self):
-        """Extract structured data from parsed segments"""
-        self.parsed_data = {
-            'interchange_control': {},
-            'functional_groups': [],
-            'transaction_sets': [],
-            'claims': [],
-            'providers': [],
-            'subscribers': [],
-            'patients': []
-        }
+    def _detect_transaction_type(self):
+        """Detect the transaction type from ST segment"""
+        for segment in self.segments:
+            if segment.tag == 'ST' and len(segment.elements) >= 1:
+                transaction_id = segment.elements[0]
+                if transaction_id == '837':
+                    self.transaction_type = '837'
+                    break
+                elif transaction_id == '820':
+                    self.transaction_type = '820'
+                    break
         
+        if not self.transaction_type:
+            self.transaction_type = '837'  # Default to 837 for backward compatibility
+    
+    def _initialize_data_structure(self):
+        """Initialize data structure based on transaction type"""
+        if self.transaction_type == '837':
+            self.parsed_data = {
+                'interchange_control': {},
+                'functional_groups': [],
+                'transaction_sets': [],
+                'claims': [],
+                'providers': [],
+                'subscribers': [],
+                'patients': []
+            }
+        elif self.transaction_type == '820':
+            self.parsed_data = {
+                'interchange_control': {},
+                'functional_groups': [],
+                'transaction_sets': [],
+                'payment_info': {},
+                'remittance_data': [],
+                'payers': [],
+                'payees': [],
+                'adjustments': [],
+                'service_payments': []
+            }
+    
+    def _extract_structured_data(self):
+        """Extract structured data from parsed segments based on transaction type"""
         current_transaction = None
         current_claim = None
         current_hierarchy_level = None
+        current_remittance = None
         
         for segment in self.segments:
             if segment.tag == 'ISA':
@@ -239,16 +374,34 @@ class EDI837Parser:
                 self._parse_bht(segment, current_transaction)
             elif segment.tag == 'NM1':
                 self._parse_nm1(segment)
-            elif segment.tag == 'CLM':
-                current_claim = self._parse_clm(segment)
-            elif segment.tag == 'HL':
-                current_hierarchy_level = self._parse_hl(segment)
             elif segment.tag == 'DTP':
                 self._parse_dtp(segment)
-            elif segment.tag == 'HI':
-                self._parse_hi(segment, current_claim)
-            elif segment.tag == 'SV1':
-                self._parse_sv1(segment, current_claim)
+            
+            # EDI 837 specific parsing
+            if self.transaction_type == '837':
+                if segment.tag == 'CLM':
+                    current_claim = self._parse_clm(segment)
+                elif segment.tag == 'HL':
+                    current_hierarchy_level = self._parse_hl(segment)
+                elif segment.tag == 'HI':
+                    self._parse_hi(segment, current_claim)
+                elif segment.tag == 'SV1':
+                    self._parse_sv1(segment, current_claim)
+            
+            # EDI 820 specific parsing
+            elif self.transaction_type == '820':
+                if segment.tag == 'BPR':
+                    self._parse_bpr(segment)
+                elif segment.tag == 'TRN':
+                    self._parse_trn(segment)
+                elif segment.tag == 'RMR':
+                    current_remittance = self._parse_rmr(segment)
+                elif segment.tag == 'SVC':
+                    self._parse_svc_820(segment)
+                elif segment.tag == 'CAS':
+                    self._parse_cas(segment)
+                elif segment.tag == 'PLB':
+                    self._parse_plb(segment)
     
     def _parse_isa(self, segment: EDISegment):
         """Parse ISA - Interchange Control Header"""
@@ -311,7 +464,7 @@ class EDI837Parser:
             })
     
     def _parse_nm1(self, segment: EDISegment):
-        """Parse NM1 - Individual or Organizational Name"""
+        """Parse NM1 - Individual or Organizational Name (both 837 and 820)"""
         if len(segment.elements) >= 3:
             entity_type = segment.elements[0]
             entity_type_desc = self.entity_types.get(entity_type, f'Unknown ({entity_type})')
@@ -329,12 +482,19 @@ class EDI837Parser:
                 'id_code': segment.elements[8] if len(segment.elements) > 8 else ''
             }
             
-            if entity_type in ['85', '87', 'DN', 'P3', '82']:
-                self.parsed_data['providers'].append(name_info)
-            elif entity_type == 'IL':
-                self.parsed_data['subscribers'].append(name_info)
-            elif entity_type == 'QC':
-                self.parsed_data['patients'].append(name_info)
+            # Route to appropriate collection based on transaction type
+            if self.transaction_type == '837':
+                if entity_type in ['85', '87', 'DN', 'P3', '82']:
+                    self.parsed_data['providers'].append(name_info)
+                elif entity_type == 'IL':
+                    self.parsed_data['subscribers'].append(name_info)
+                elif entity_type == 'QC':
+                    self.parsed_data['patients'].append(name_info)
+            elif self.transaction_type == '820':
+                if entity_type == 'PE':
+                    self.parsed_data['payees'].append(name_info)
+                elif entity_type == 'PR':
+                    self.parsed_data['payers'].append(name_info)
     
     def _parse_clm(self, segment: EDISegment):
         """Parse CLM - Claim Information"""
@@ -398,10 +558,108 @@ class EDI837Parser:
                 'place_of_service': segment.elements[4] if len(segment.elements) > 4 else ''
             }
             claim['service_lines'].append(service_line)
+    
+    # EDI 820 specific parsing methods
+    def _parse_bpr(self, segment: EDISegment):
+        """Parse BPR - Beginning Segment for Payment Order/Remittance Advice"""
+        if len(segment.elements) >= 4:
+            self.parsed_data['payment_info'] = {
+                'transaction_handling_code': segment.elements[0],
+                'payment_amount': segment.elements[1],
+                'credit_debit_flag': segment.elements[2],
+                'payment_method': segment.elements[3],
+                'payment_format': segment.elements[4] if len(segment.elements) > 4 else '',
+                'dfi_qualifier': segment.elements[5] if len(segment.elements) > 5 else '',
+                'dfi_identification': segment.elements[6] if len(segment.elements) > 6 else '',
+                'account_qualifier': segment.elements[7] if len(segment.elements) > 7 else '',
+                'account_number': segment.elements[8] if len(segment.elements) > 8 else '',
+                'originating_company_id': segment.elements[9] if len(segment.elements) > 9 else '',
+                'supplemental_code': segment.elements[10] if len(segment.elements) > 10 else ''
+            }
+    
+    def _parse_trn(self, segment: EDISegment):
+        """Parse TRN - Trace"""
+        if len(segment.elements) >= 2:
+            if 'trace_info' not in self.parsed_data:
+                self.parsed_data['trace_info'] = []
+            
+            trace_info = {
+                'trace_type_code': segment.elements[0],
+                'reference_id': segment.elements[1],
+                'originating_company_id': segment.elements[2] if len(segment.elements) > 2 else '',
+                'reference_id_2': segment.elements[3] if len(segment.elements) > 3 else ''
+            }
+            self.parsed_data['trace_info'].append(trace_info)
+    
+    def _parse_rmr(self, segment: EDISegment):
+        """Parse RMR - Remittance Advice"""
+        if len(segment.elements) >= 4:
+            remittance = {
+                'reference_id_qualifier': segment.elements[0],
+                'reference_id': segment.elements[1],
+                'payment_action_code': segment.elements[2],
+                'payment_amount': segment.elements[3],
+                'adjustment_amount': segment.elements[4] if len(segment.elements) > 4 else '',
+                'outstanding_balance': segment.elements[5] if len(segment.elements) > 5 else '',
+                'service_payments': []
+            }
+            self.parsed_data['remittance_data'].append(remittance)
+            return remittance
+        return None
+    
+    def _parse_svc_820(self, segment: EDISegment):
+        """Parse SVC - Service Payment Information (for EDI 820)"""
+        if len(segment.elements) >= 3:
+            service_payment = {
+                'service_id_qualifier': segment.elements[0],
+                'charge_amount': segment.elements[1],
+                'payment_amount': segment.elements[2],
+                'revenue_code': segment.elements[3] if len(segment.elements) > 3 else '',
+                'service_quantity': segment.elements[4] if len(segment.elements) > 4 else '',
+                'bundled_service_id': segment.elements[5] if len(segment.elements) > 5 else '',
+                'approved_quantity': segment.elements[6] if len(segment.elements) > 6 else '',
+                'adjustments': []
+            }
+            self.parsed_data['service_payments'].append(service_payment)
+    
+    def _parse_cas(self, segment: EDISegment):
+        """Parse CAS - Claims Adjustment"""
+        if len(segment.elements) >= 3:
+            adjustment = {
+                'group_code': segment.elements[0],
+                'reason_code': segment.elements[1],
+                'adjustment_amount': segment.elements[2],
+                'adjustment_quantity': segment.elements[3] if len(segment.elements) > 3 else '',
+                'reason_code_2': segment.elements[4] if len(segment.elements) > 4 else '',
+                'adjustment_amount_2': segment.elements[5] if len(segment.elements) > 5 else ''
+            }
+            self.parsed_data['adjustments'].append(adjustment)
+    
+    def _parse_plb(self, segment: EDISegment):
+        """Parse PLB - Provider Level Adjustment"""
+        if len(segment.elements) >= 5:
+            provider_adjustment = {
+                'provider_id': segment.elements[0],
+                'fiscal_period_date': segment.elements[1],
+                'adjustment_id_qualifier': segment.elements[2],
+                'adjustment_number': segment.elements[3],
+                'adjustment_amount': segment.elements[4]
+            }
+            if 'provider_adjustments' not in self.parsed_data:
+                self.parsed_data['provider_adjustments'] = []
+            self.parsed_data['provider_adjustments'].append(provider_adjustment)
 
     def get_summary_table(self) -> List[Dict[str, Any]]:
-        """Generate summary table data for web display"""
+        """Generate summary table data for web display (supports both 837 and 820)"""
         summary = []
+        
+        # Transaction type
+        summary.append({
+            'Section': 'Transaction Info',
+            'Field': 'Transaction Type',
+            'Value': f'EDI {self.transaction_type}',
+            'Description': f'EDI {self.transaction_type} - {"Healthcare Claims" if self.transaction_type == "837" else "Payment Order/Remittance Advice"}'
+        })
         
         # Interchange Control
         if self.parsed_data.get('interchange_control'):
@@ -428,86 +686,163 @@ class EDI837Parser:
                 'Section': 'Interchange Control',
                 'Field': 'Version',
                 'Value': ic.get('version', ''),
-                'Description': 'EDI Version (X222/X223/X224)'
+                'Description': 'EDI Version (X222/X223/X224 for 837, 5010 for 820)'
             })
         
-        # Claims
-        for i, claim in enumerate(self.parsed_data.get('claims', [])):
-            summary.append({
-                'Section': f'Claim {i+1}',
-                'Field': 'Claim ID',
-                'Value': claim.get('claim_id', ''),
-                'Description': 'Patient Account Number'
-            })
-            summary.append({
-                'Section': f'Claim {i+1}',
-                'Field': 'Claim Amount',
-                'Value': claim.get('claim_amount', ''),
-                'Description': 'Total Claim Charge Amount'
-            })
-            summary.append({
-                'Section': f'Claim {i+1}',
-                'Field': 'Place of Service',
-                'Value': claim.get('place_of_service', ''),
-                'Description': 'Place of Service Code'
-            })
+        # EDI 837 specific sections
+        if self.transaction_type == '837':
+            # Claims
+            for i, claim in enumerate(self.parsed_data.get('claims', [])):
+                summary.append({
+                    'Section': f'Claim {i+1}',
+                    'Field': 'Claim ID',
+                    'Value': claim.get('claim_id', ''),
+                    'Description': 'Patient Account Number'
+                })
+                summary.append({
+                    'Section': f'Claim {i+1}',
+                    'Field': 'Claim Amount',
+                    'Value': claim.get('claim_amount', ''),
+                    'Description': 'Total Claim Charge Amount'
+                })
+                summary.append({
+                    'Section': f'Claim {i+1}',
+                    'Field': 'Place of Service',
+                    'Value': claim.get('place_of_service', ''),
+                    'Description': 'Place of Service Code'
+                })
+            
+            # Providers
+            for i, provider in enumerate(self.parsed_data.get('providers', [])):
+                summary.append({
+                    'Section': f'Provider {i+1}',
+                    'Field': 'Entity Type',
+                    'Value': provider.get('entity_type_description', ''),
+                    'Description': f"Provider Type ({provider.get('entity_type_code', '')})"
+                })
+                summary.append({
+                    'Section': f'Provider {i+1}',
+                    'Field': 'Name',
+                    'Value': f"{provider.get('name_first', '')} {provider.get('name_last_or_organization', '')}".strip(),
+                    'Description': 'Provider Name'
+                })
+                summary.append({
+                    'Section': f'Provider {i+1}',
+                    'Field': 'ID',
+                    'Value': provider.get('id_code', ''),
+                    'Description': f"Provider ID ({provider.get('id_code_qualifier', '')})"
+                })
+            
+            # Subscribers
+            for i, subscriber in enumerate(self.parsed_data.get('subscribers', [])):
+                summary.append({
+                    'Section': f'Subscriber {i+1}',
+                    'Field': 'Name',
+                    'Value': f"{subscriber.get('name_first', '')} {subscriber.get('name_last_or_organization', '')}".strip(),
+                    'Description': 'Subscriber Name'
+                })
+                summary.append({
+                    'Section': f'Subscriber {i+1}',
+                    'Field': 'ID',
+                    'Value': subscriber.get('id_code', ''),
+                    'Description': f"Subscriber ID ({subscriber.get('id_code_qualifier', '')})"
+                })
+            
+            # Patients
+            for i, patient in enumerate(self.parsed_data.get('patients', [])):
+                summary.append({
+                    'Section': f'Patient {i+1}',
+                    'Field': 'Name',
+                    'Value': f"{patient.get('name_first', '')} {patient.get('name_last_or_organization', '')}".strip(),
+                    'Description': 'Patient Name'
+                })
+                summary.append({
+                    'Section': f'Patient {i+1}',
+                    'Field': 'ID',
+                    'Value': patient.get('id_code', ''),
+                    'Description': f"Patient ID ({patient.get('id_code_qualifier', '')})"
+                })
         
-        # Providers
-        for i, provider in enumerate(self.parsed_data.get('providers', [])):
-            summary.append({
-                'Section': f'Provider {i+1}',
-                'Field': 'Entity Type',
-                'Value': provider.get('entity_type_description', ''),
-                'Description': f"Provider Type ({provider.get('entity_type_code', '')})"
-            })
-            summary.append({
-                'Section': f'Provider {i+1}',
-                'Field': 'Name',
-                'Value': f"{provider.get('name_first', '')} {provider.get('name_last_or_organization', '')}".strip(),
-                'Description': 'Provider Name'
-            })
-            summary.append({
-                'Section': f'Provider {i+1}',
-                'Field': 'ID',
-                'Value': provider.get('id_code', ''),
-                'Description': f"Provider ID ({provider.get('id_code_qualifier', '')})"
-            })
-        
-        # Subscribers
-        for i, subscriber in enumerate(self.parsed_data.get('subscribers', [])):
-            summary.append({
-                'Section': f'Subscriber {i+1}',
-                'Field': 'Name',
-                'Value': f"{subscriber.get('name_first', '')} {subscriber.get('name_last_or_organization', '')}".strip(),
-                'Description': 'Subscriber Name'
-            })
-            summary.append({
-                'Section': f'Subscriber {i+1}',
-                'Field': 'ID',
-                'Value': subscriber.get('id_code', ''),
-                'Description': f"Subscriber ID ({subscriber.get('id_code_qualifier', '')})"
-            })
-        
-        # Patients
-        for i, patient in enumerate(self.parsed_data.get('patients', [])):
-            summary.append({
-                'Section': f'Patient {i+1}',
-                'Field': 'Name',
-                'Value': f"{patient.get('name_first', '')} {patient.get('name_last_or_organization', '')}".strip(),
-                'Description': 'Patient Name'
-            })
-            summary.append({
-                'Section': f'Patient {i+1}',
-                'Field': 'ID',
-                'Value': patient.get('id_code', ''),
-                'Description': f"Patient ID ({patient.get('id_code_qualifier', '')})"
-            })
+        # EDI 820 specific sections
+        elif self.transaction_type == '820':
+            # Payment Information
+            if self.parsed_data.get('payment_info'):
+                pi = self.parsed_data['payment_info']
+                summary.append({
+                    'Section': 'Payment Info',
+                    'Field': 'Payment Amount',
+                    'Value': pi.get('payment_amount', ''),
+                    'Description': 'Total Payment Amount'
+                })
+                summary.append({
+                    'Section': 'Payment Info',
+                    'Field': 'Payment Method',
+                    'Value': pi.get('payment_method', ''),
+                    'Description': 'Payment Method Code'
+                })
+                summary.append({
+                    'Section': 'Payment Info',
+                    'Field': 'Credit/Debit',
+                    'Value': pi.get('credit_debit_flag', ''),
+                    'Description': 'Credit or Debit Flag'
+                })
+                summary.append({
+                    'Section': 'Payment Info',
+                    'Field': 'Account Number',
+                    'Value': pi.get('account_number', ''),
+                    'Description': 'Payment Account Number'
+                })
+            
+            # Payers
+            for i, payer in enumerate(self.parsed_data.get('payers', [])):
+                summary.append({
+                    'Section': f'Payer {i+1}',
+                    'Field': 'Name',
+                    'Value': f"{payer.get('name_first', '')} {payer.get('name_last_or_organization', '')}".strip(),
+                    'Description': 'Payer Name'
+                })
+                summary.append({
+                    'Section': f'Payer {i+1}',
+                    'Field': 'ID',
+                    'Value': payer.get('id_code', ''),
+                    'Description': f"Payer ID ({payer.get('id_code_qualifier', '')})"
+                })
+            
+            # Payees
+            for i, payee in enumerate(self.parsed_data.get('payees', [])):
+                summary.append({
+                    'Section': f'Payee {i+1}',
+                    'Field': 'Name',
+                    'Value': f"{payee.get('name_first', '')} {payee.get('name_last_or_organization', '')}".strip(),
+                    'Description': 'Payee Name'
+                })
+                summary.append({
+                    'Section': f'Payee {i+1}',
+                    'Field': 'ID',
+                    'Value': payee.get('id_code', ''),
+                    'Description': f"Payee ID ({payee.get('id_code_qualifier', '')})"
+                })
+            
+            # Remittance Data
+            for i, rmr in enumerate(self.parsed_data.get('remittance_data', [])):
+                summary.append({
+                    'Section': f'Remittance {i+1}',
+                    'Field': 'Reference ID',
+                    'Value': rmr.get('reference_id', ''),
+                    'Description': 'Remittance Reference Identifier'
+                })
+                summary.append({
+                    'Section': f'Remittance {i+1}',
+                    'Field': 'Payment Amount',
+                    'Value': rmr.get('payment_amount', ''),
+                    'Description': 'Payment Amount for this Remittance'
+                })
         
         return summary
 
     def get_data_summary(self) -> Dict[str, Any]:
-        """Generate comprehensive data summary for statistics display"""
-        # Common procedure code descriptions for reference
+        """Generate comprehensive data summary for statistics display (supports both 837 and 820)"""
+        # Common procedure code descriptions for reference (837) and adjustment codes for 820
         procedure_descriptions = {
             # CPT Codes - Evaluation and Management
             '99213': 'Office/Outpatient Visit - Est Patient (15 min)',
@@ -555,121 +890,212 @@ class EDI837Parser:
             'L3806': 'Wrist Hand Finger Orthosis',
         }
         
+        # Adjustment reason codes for EDI 820
+        adjustment_reason_codes = {
+            '1': 'Deductible Amount',
+            '2': 'Coinsurance Amount',
+            '3': 'Co-payment Amount',
+            '4': 'The procedure code is inconsistent with the modifier used or a required modifier is missing.',
+            '5': 'The procedure code/bill type is inconsistent with the place of service.',
+            '6': 'The procedure/revenue code is inconsistent with the patient\'s age.',
+            '7': 'The procedure/revenue code is inconsistent with the patient\'s gender.',
+            '8': 'The procedure code is inconsistent with the provider type/specialty.',
+            '9': 'The diagnosis is inconsistent with the patient\'s age.',
+            '10': 'The diagnosis is inconsistent with the patient\'s gender.',
+            '11': 'The diagnosis is inconsistent with the procedure.',
+            '12': 'The diagnosis is inconsistent with the provider type.',
+            '13': 'The date of death precedes the date of service.',
+            '14': 'The date of birth follows the date of service.',
+            '15': 'The authorization number is missing, invalid, or does not apply to the billed services or provider.',
+        }
+        
         summary = {
             'counts': {},
             'amounts': {},
             'details': {},
             'coverage': {},
-            'procedure_analysis': {}
+            'transaction_type': self.transaction_type
         }
         
-        # Count basic entities
-        summary['counts']['total_claims'] = len(self.parsed_data.get('claims', []))
-        summary['counts']['total_providers'] = len(self.parsed_data.get('providers', []))
-        summary['counts']['total_subscribers'] = len(self.parsed_data.get('subscribers', []))
-        summary['counts']['total_patients'] = len(self.parsed_data.get('patients', []))
+        # Common counts
         summary['counts']['total_segments'] = len(self.segments)
         
-        # Calculate financial amounts and procedure analysis
-        total_claim_amount = 0
-        total_service_amount = 0
-        service_lines_count = 0
-        procedure_amounts = {}  # Track amounts by procedure code
-        procedure_counts = {}   # Track frequency by procedure code
-        
-        for claim in self.parsed_data.get('claims', []):
-            # Claim amounts
-            if claim.get('claim_amount'):
-                try:
-                    total_claim_amount += float(claim['claim_amount'])
-                except (ValueError, TypeError):
-                    pass
+        if self.transaction_type == '837':
+            # EDI 837 specific analysis
+            summary['procedure_analysis'] = {}
             
-            # Service line amounts and procedure analysis
-            for service in claim.get('service_lines', []):
-                service_lines_count += 1
-                charge_amount = 0
-                
-                if service.get('charge_amount'):
+            # Count basic entities
+            summary['counts']['total_claims'] = len(self.parsed_data.get('claims', []))
+            summary['counts']['total_providers'] = len(self.parsed_data.get('providers', []))
+            summary['counts']['total_subscribers'] = len(self.parsed_data.get('subscribers', []))
+            summary['counts']['total_patients'] = len(self.parsed_data.get('patients', []))
+            
+            # Calculate financial amounts and procedure analysis
+            total_claim_amount = 0
+            total_service_amount = 0
+            service_lines_count = 0
+            procedure_amounts = {}  # Track amounts by procedure code
+            procedure_counts = {}   # Track frequency by procedure code
+            
+            for claim in self.parsed_data.get('claims', []):
+                # Claim amounts
+                if claim.get('claim_amount'):
                     try:
-                        charge_amount = float(service['charge_amount'])
-                        total_service_amount += charge_amount
+                        total_claim_amount += float(claim['claim_amount'])
                     except (ValueError, TypeError):
                         pass
                 
-                # Analyze procedure codes with amounts
-                proc_code = service.get('procedure_code', '')
-                if proc_code:
-                    # Extract code type and main code
-                    if ':' in proc_code:
-                        code_type, main_code = proc_code.split(':', 1)
-                    else:
-                        code_type = 'UNKNOWN'
-                        main_code = proc_code
+                # Service line amounts and procedure analysis
+                for service in claim.get('service_lines', []):
+                    service_lines_count += 1
+                    charge_amount = 0
                     
-                    # Track procedure amounts and counts
-                    if main_code not in procedure_amounts:
-                        procedure_amounts[main_code] = {
-                            'total_amount': 0,
-                            'count': 0,
-                            'code_type': code_type,
-                            'description': procedure_descriptions.get(main_code, f'Procedure Code {main_code}')
-                        }
+                    if service.get('charge_amount'):
+                        try:
+                            charge_amount = float(service['charge_amount'])
+                            total_service_amount += charge_amount
+                        except (ValueError, TypeError):
+                            pass
                     
-                    procedure_amounts[main_code]['total_amount'] += charge_amount
-                    procedure_amounts[main_code]['count'] += 1
-                    procedure_counts[main_code] = procedure_counts.get(main_code, 0) + 1
-        
-        summary['amounts']['total_claim_amount'] = total_claim_amount
-        summary['amounts']['total_service_amount'] = total_service_amount
-        summary['amounts']['average_claim_amount'] = (
-            total_claim_amount / summary['counts']['total_claims'] 
-            if summary['counts']['total_claims'] > 0 else 0
-        )
-        summary['counts']['total_service_lines'] = service_lines_count
-        
-        # Enhanced procedure analysis
-        summary['procedure_analysis']['by_amount'] = procedure_amounts
-        summary['procedure_analysis']['total_procedures'] = len(procedure_amounts)
-        
-        # Top procedures by amount
-        top_by_amount = sorted(
-            procedure_amounts.items(), 
-            key=lambda x: x[1]['total_amount'], 
-            reverse=True
-        )[:10]
-        summary['procedure_analysis']['top_by_amount'] = top_by_amount
-        
-        # Top procedures by frequency
-        top_by_frequency = sorted(
-            procedure_amounts.items(), 
-            key=lambda x: x[1]['count'], 
-            reverse=True
-        )[:10]
-        summary['procedure_analysis']['top_by_frequency'] = top_by_frequency
-        
-        # Provider details
-        provider_types = {}
-        for provider in self.parsed_data.get('providers', []):
-            ptype = provider.get('entity_type_description', 'Unknown')
-            provider_types[ptype] = provider_types.get(ptype, 0) + 1
-        summary['details']['provider_types'] = provider_types
-        
-        # Service details (keeping original structure for compatibility)
-        diagnosis_codes = []
-        
-        for claim in self.parsed_data.get('claims', []):
+                    # Analyze procedure codes with amounts
+                    proc_code = service.get('procedure_code', '')
+                    if proc_code:
+                        # Extract code type and main code
+                        if ':' in proc_code:
+                            code_type, main_code = proc_code.split(':', 1)
+                        else:
+                            code_type = 'UNKNOWN'
+                            main_code = proc_code
+                        
+                        # Track procedure amounts and counts
+                        if main_code not in procedure_amounts:
+                            procedure_amounts[main_code] = {
+                                'total_amount': 0,
+                                'count': 0,
+                                'code_type': code_type,
+                                'description': procedure_descriptions.get(main_code, f'Procedure Code {main_code}')
+                            }
+                        
+                        procedure_amounts[main_code]['total_amount'] += charge_amount
+                        procedure_amounts[main_code]['count'] += 1
+                        procedure_counts[main_code] = procedure_counts.get(main_code, 0) + 1
+            
+            summary['amounts']['total_claim_amount'] = total_claim_amount
+            summary['amounts']['total_service_amount'] = total_service_amount
+            summary['amounts']['average_claim_amount'] = (
+                total_claim_amount / summary['counts']['total_claims'] 
+                if summary['counts']['total_claims'] > 0 else 0
+            )
+            summary['counts']['total_service_lines'] = service_lines_count
+            
+            # Enhanced procedure analysis
+            summary['procedure_analysis']['by_amount'] = procedure_amounts
+            summary['procedure_analysis']['total_procedures'] = len(procedure_amounts)
+            
+            # Top procedures by amount
+            top_by_amount = sorted(
+                procedure_amounts.items(), 
+                key=lambda x: x[1]['total_amount'], 
+                reverse=True
+            )[:10]
+            summary['procedure_analysis']['top_by_amount'] = top_by_amount
+            
+            # Top procedures by frequency
+            top_by_frequency = sorted(
+                procedure_amounts.items(), 
+                key=lambda x: x[1]['count'], 
+                reverse=True
+            )[:10]
+            summary['procedure_analysis']['top_by_frequency'] = top_by_frequency
+            
+            # Provider details
+            provider_types = {}
+            for provider in self.parsed_data.get('providers', []):
+                ptype = provider.get('entity_type_description', 'Unknown')
+                provider_types[ptype] = provider_types.get(ptype, 0) + 1
+            summary['details']['provider_types'] = provider_types
+            
             # Diagnosis codes
-            for diag in claim.get('diagnosis_codes', []):
-                if diag.get('code'):
-                    diagnosis_codes.append(diag['code'])
+            diagnosis_codes = []
+            for claim in self.parsed_data.get('claims', []):
+                for diag in claim.get('diagnosis_codes', []):
+                    if diag.get('code'):
+                        diagnosis_codes.append(diag['code'])
+            
+            summary['details']['procedure_codes'] = procedure_counts
+            summary['details']['diagnosis_codes'] = list(set(diagnosis_codes))  # Unique codes
+            summary['counts']['unique_procedures'] = len(procedure_counts)
+            summary['counts']['unique_diagnoses'] = len(set(diagnosis_codes))
         
-        summary['details']['procedure_codes'] = procedure_counts
-        summary['details']['diagnosis_codes'] = list(set(diagnosis_codes))  # Unique codes
-        summary['counts']['unique_procedures'] = len(procedure_counts)
-        summary['counts']['unique_diagnoses'] = len(set(diagnosis_codes))
+        elif self.transaction_type == '820':
+            # EDI 820 specific analysis
+            summary['payment_analysis'] = {}
+            summary['remittance_analysis'] = {}
+            
+            # Count basic entities
+            summary['counts']['total_payers'] = len(self.parsed_data.get('payers', []))
+            summary['counts']['total_payees'] = len(self.parsed_data.get('payees', []))
+            summary['counts']['total_remittances'] = len(self.parsed_data.get('remittance_data', []))
+            summary['counts']['total_service_payments'] = len(self.parsed_data.get('service_payments', []))
+            summary['counts']['total_adjustments'] = len(self.parsed_data.get('adjustments', []))
+            
+            # Payment analysis
+            payment_info = self.parsed_data.get('payment_info', {})
+            if payment_info:
+                try:
+                    summary['amounts']['total_payment_amount'] = float(payment_info.get('payment_amount', 0))
+                except (ValueError, TypeError):
+                    summary['amounts']['total_payment_amount'] = 0
+                
+                summary['details']['payment_method'] = payment_info.get('payment_method', '')
+                summary['details']['credit_debit_flag'] = payment_info.get('credit_debit_flag', '')
+            else:
+                summary['amounts']['total_payment_amount'] = 0
+            
+            # Remittance analysis
+            total_remittance_amount = 0
+            total_adjustment_amount = 0
+            
+            for rmr in self.parsed_data.get('remittance_data', []):
+                try:
+                    if rmr.get('payment_amount'):
+                        total_remittance_amount += float(rmr['payment_amount'])
+                    if rmr.get('adjustment_amount'):
+                        total_adjustment_amount += float(rmr['adjustment_amount'])
+                except (ValueError, TypeError):
+                    pass
+            
+            summary['amounts']['total_remittance_amount'] = total_remittance_amount
+            summary['amounts']['total_adjustment_amount'] = total_adjustment_amount
+            
+            # Adjustment analysis
+            adjustment_types = {}
+            adjustment_reasons = {}
+            
+            for adj in self.parsed_data.get('adjustments', []):
+                group_code = adj.get('group_code', 'Unknown')
+                reason_code = adj.get('reason_code', 'Unknown')
+                
+                adjustment_types[group_code] = adjustment_types.get(group_code, 0) + 1
+                
+                reason_desc = adjustment_reason_codes.get(reason_code, f'Code {reason_code}')
+                adjustment_reasons[reason_desc] = adjustment_reasons.get(reason_desc, 0) + 1
+            
+            summary['details']['adjustment_types'] = adjustment_types
+            summary['details']['adjustment_reasons'] = adjustment_reasons
+            
+            # Service payment analysis
+            service_payment_total = 0
+            for svc in self.parsed_data.get('service_payments', []):
+                try:
+                    if svc.get('payment_amount'):
+                        service_payment_total += float(svc['payment_amount'])
+                except (ValueError, TypeError):
+                    pass
+            
+            summary['amounts']['total_service_payment_amount'] = service_payment_total
         
-        # Transaction details
+        # Common transaction details
         ic = self.parsed_data.get('interchange_control', {})
         summary['details']['sender_id'] = ic.get('sender_id', '')
         summary['details']['receiver_id'] = ic.get('receiver_id', '')
