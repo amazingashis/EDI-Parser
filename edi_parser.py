@@ -1,7 +1,10 @@
 """
 Universal EDI Parser (5010)
-Supports EDI 837 (Healthcare Claims) and EDI 820 (Payment Order/Remittance Advice)
-Supports X222, X223, X224 versions for 837; 820 versions 5010
+Supports multiple healthcare EDI transactions organized by layout:
+- EDI 837 (Healthcare Claims) - Claims Layout
+- EDI 820 (Payment Order/Remittance Advice) - Revenue Layout  
+- EDI 834 (Benefit Enrollment and Maintenance) - Member Layout
+Supports X222, X223, X224 versions for 837; 5010 versions for 820/834
 """
 
 import re
@@ -18,9 +21,16 @@ class EDISegment:
 
 class UniversalEDIParser:
     """
-    Universal EDI Parser supporting multiple transaction types:
+    Universal EDI Parser supporting healthcare transaction layouts:
+    
+    CLAIMS LAYOUT:
     - EDI 837: Health Care Claims (X222/X223/X224 versions)
+    
+    REVENUE LAYOUT: 
     - EDI 820: Payment Order/Remittance Advice (5010)
+    
+    MEMBER LAYOUT:
+    - EDI 834: Benefit Enrollment and Maintenance (5010)
     """
     
     def __init__(self):
@@ -63,7 +73,7 @@ class UniversalEDIParser:
             'SV3': 'Dental Service',
             'DX': 'Diagnosis',
             
-            # EDI 820 specific segments
+            # EDI 820 specific segments (Revenue Layout)
             'TRN': 'Trace',
             'CUR': 'Currency',
             'RMR': 'Remittance Advice',
@@ -80,7 +90,24 @@ class UniversalEDIParser:
             'FTX': 'Free Text',
             'BPR': 'Beginning Segment for Payment Order/Remittance Advice',
             'TED': 'Technical Error Description',
-            'SCH': 'Line Item Schedule'
+            'SCH': 'Line Item Schedule',
+            
+            # EDI 834 specific segments (Member Layout)
+            'BGN': 'Beginning Segment',
+            'QTY': 'Quantity Information',
+            'N1': 'Party Identification',
+            'INS': 'Member Level Detail',
+            'COB': 'Coordination of Benefits',
+            'DSB': 'Disability Information',
+            'HD': 'Health Coverage',
+            'DX': 'Diagnosis',
+            'ICM': 'Member Income',
+            'LS': 'Loop Header',
+            'LE': 'Loop Trailer',
+            'LUI': 'Language Use',
+            'EC': 'Employment Class',
+            'EMS': 'Employment Status',
+            'SSE': 'Entry and Exit Information'
         }
         
         # Entity type codes for NM1 segments (837 + 820)
@@ -99,22 +126,39 @@ class UniversalEDIParser:
             'P3': 'Primary Care Provider',
             '82': 'Rendering Provider',
             
-            # EDI 820 specific entity types
+            # EDI 820 specific entity types (Revenue Layout)
             'PE': 'Payee',
-            'PR': 'Payer',
             'TT': 'Third Party Administrator',
             'GP': 'Group',
             'BO': 'Broker or Sales Office',
             'FA': 'Facility',
             'LI': 'Limited Partner',
-            'GP': 'General Partner',
             'SJ': 'Service Organization',
             'PT': 'Patient',
             'QD': 'Responsible Party',
             'QN': 'Credit Recipient',
             'TL': 'Training Location',
             'VN': 'Vendor',
-            'X3': 'Dependent'
+            'X3': 'Dependent',
+            
+            # EDI 834 specific entity types (Member Layout)
+            'P5': 'Plan Sponsor',
+            'IN': 'Insurer',
+            'BO': 'Broker',
+            'TV': 'Third Party Administrator',
+            'P6': 'Third Party Administrator',
+            'GP': 'Gateway Provider',
+            'Y2': 'Employer',
+            'ZZ': 'Mutually Defined',
+            'S1': 'Submitter',
+            'R1': 'Receiver',
+            'C1': 'Member',
+            'E1': 'Employee',
+            'D1': 'Dependent',
+            'S2': 'Spouse',
+            'DX': 'Dependent',
+            '19': 'Child',
+            '53': 'Life Partner'
         }
         
         # Detailed element definitions for each segment
@@ -249,6 +293,57 @@ class UniversalEDIParser:
                 {'pos': '03', 'name': 'Reference Identification Qualifier', 'description': 'Adjustment identifier qualifier'},
                 {'pos': '04', 'name': 'Reference Identification', 'description': 'Provider adjustment number'},
                 {'pos': '05', 'name': 'Monetary Amount', 'description': 'Provider adjustment amount'}
+            ],
+            
+            # EDI 834 specific element definitions (Member Layout)
+            'BGN': [
+                {'pos': '01', 'name': 'Transaction Set Purpose Code', 'description': 'Code identifying the purpose of the transaction set'},
+                {'pos': '02', 'name': 'Reference Identification', 'description': 'Reference information for the transaction'},
+                {'pos': '03', 'name': 'Date', 'description': 'Date expressed as CCYYMMDD'},
+                {'pos': '04', 'name': 'Time', 'description': 'Time expressed in 24-hour clock time'},
+                {'pos': '05', 'name': 'Time Zone Code', 'description': 'Code identifying the time zone'},
+                {'pos': '06', 'name': 'Reference Identification', 'description': 'Original transaction reference'},
+                {'pos': '07', 'name': 'Transaction Type Code', 'description': 'Code specifying the type of transaction'},
+                {'pos': '08', 'name': 'Action Code', 'description': 'Code indicating the action to be taken'}
+            ],
+            'INS': [
+                {'pos': '01', 'name': 'Member Indicator', 'description': 'Code indicating if person is a member or dependent'},
+                {'pos': '02', 'name': 'Individual Relationship Code', 'description': 'Code indicating relationship to primary member'},
+                {'pos': '03', 'name': 'Maintenance Type Code', 'description': 'Code identifying the maintenance action'},
+                {'pos': '04', 'name': 'Maintenance Reason Code', 'description': 'Code identifying the reason for maintenance'},
+                {'pos': '05', 'name': 'Benefit Status Code', 'description': 'Code identifying the benefit status'},
+                {'pos': '06', 'name': 'Medicare Plan Code', 'description': 'Code identifying Medicare plan'},
+                {'pos': '07', 'name': 'Eligibility Reason Code', 'description': 'Code identifying eligibility reason'},
+                {'pos': '08', 'name': 'Employment Status Code', 'description': 'Code identifying employment status'},
+                {'pos': '09', 'name': 'Student Status Code', 'description': 'Code identifying student status'},
+                {'pos': '10', 'name': 'Handicap Indicator', 'description': 'Code indicating handicap status'},
+                {'pos': '11', 'name': 'Date Time Period Format Qualifier', 'description': 'Code indicating date format'},
+                {'pos': '12', 'name': 'Date Time Period', 'description': 'Date of death'},
+                {'pos': '13', 'name': 'Confidentiality Code', 'description': 'Code indicating confidentiality level'},
+                {'pos': '14', 'name': 'City Name', 'description': 'Birth city name'},
+                {'pos': '15', 'name': 'State or Province Code', 'description': 'Birth state or province'},
+                {'pos': '16', 'name': 'Country Code', 'description': 'Birth country code'},
+                {'pos': '17', 'name': 'Number', 'description': 'Birth sequence number'}
+            ],
+            'HD': [
+                {'pos': '01', 'name': 'Maintenance Type Code', 'description': 'Code indicating the maintenance action for coverage'},
+                {'pos': '02', 'name': 'Maintenance Reason Code', 'description': 'Code indicating reason for maintenance'},
+                {'pos': '03', 'name': 'Insurance Line Code', 'description': 'Code identifying the insurance line'},
+                {'pos': '04', 'name': 'Plan Coverage Description', 'description': 'Description of plan coverage'},
+                {'pos': '05', 'name': 'Coverage Level Code', 'description': 'Code indicating level of coverage'}
+            ],
+            'COB': [
+                {'pos': '01', 'name': 'Payer Responsibility Sequence Number Code', 'description': 'Code indicating payer sequence'},
+                {'pos': '02', 'name': 'Reference Identification', 'description': 'Member identification number'},
+                {'pos': '03', 'name': 'Coordination of Benefits Code', 'description': 'Code indicating coordination of benefits'},
+                {'pos': '04', 'name': 'Service Type Code', 'description': 'Code identifying the service type'}
+            ],
+            'ICM': [
+                {'pos': '01', 'name': 'Frequency Code', 'description': 'Code indicating frequency of income'},
+                {'pos': '02', 'name': 'Monetary Amount', 'description': 'Income amount'},
+                {'pos': '03', 'name': 'Quantity', 'description': 'Number of periods'},
+                {'pos': '04', 'name': 'Location Identifier', 'description': 'Income source location'},
+                {'pos': '05', 'name': 'Salary Grade', 'description': 'Salary grade or level'}
             ]
         }
         
@@ -327,14 +422,19 @@ class UniversalEDIParser:
                 elif transaction_id == '820':
                     self.transaction_type = '820'
                     break
+                elif transaction_id == '834':
+                    self.transaction_type = '834'
+                    break
         
         if not self.transaction_type:
             self.transaction_type = '837'  # Default to 837 for backward compatibility
     
     def _initialize_data_structure(self):
-        """Initialize data structure based on transaction type"""
+        """Initialize data structure based on transaction type and layout"""
         if self.transaction_type == '837':
+            # Claims Layout
             self.parsed_data = {
+                'layout': 'claims',
                 'interchange_control': {},
                 'functional_groups': [],
                 'transaction_sets': [],
@@ -344,7 +444,9 @@ class UniversalEDIParser:
                 'patients': []
             }
         elif self.transaction_type == '820':
+            # Revenue Layout
             self.parsed_data = {
+                'layout': 'revenue',
                 'interchange_control': {},
                 'functional_groups': [],
                 'transaction_sets': [],
@@ -354,6 +456,22 @@ class UniversalEDIParser:
                 'payees': [],
                 'adjustments': [],
                 'service_payments': []
+            }
+        elif self.transaction_type == '834':
+            # Member Layout
+            self.parsed_data = {
+                'layout': 'member',
+                'interchange_control': {},
+                'functional_groups': [],
+                'transaction_sets': [],
+                'transaction_info': {},
+                'plan_sponsors': [],
+                'insurers': [],
+                'members': [],
+                'dependents': [],
+                'coverage_info': [],
+                'employment_info': [],
+                'income_info': []
             }
     
     def _extract_structured_data(self):
