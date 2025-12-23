@@ -237,6 +237,14 @@ class UniversalEDIParser:
             'HI': [
                 {'pos': '01', 'name': 'Health Care Code Information', 'description': 'Code information for health care diagnosis, procedure, etc.'}
             ],
+            'PRV': [
+                {'pos': '01', 'name': 'Provider Code', 'description': 'Code identifying the provider type'},
+                {'pos': '02', 'name': 'Reference Identification Qualifier', 'description': 'Code qualifying the reference identification'},
+                {'pos': '03', 'name': 'Reference Identification', 'description': 'Provider specialty code (typically Healthcare Provider Taxonomy)'},
+                {'pos': '04', 'name': 'State or Province Code', 'description': 'State or province where provider is licensed'},
+                {'pos': '05', 'name': 'Provider Organization Code', 'description': 'Code identifying provider organization type'},
+                {'pos': '06', 'name': 'Provider Specialty Code', 'description': 'Additional provider specialty information'}
+            ],
             'DTP': [
                 {'pos': '01', 'name': 'Date Time Qualifier', 'description': 'Code specifying type of date or time or both date and time'},
                 {'pos': '02', 'name': 'Date Time Period Format Qualifier', 'description': 'Code indicating the date format, time format, or date and time format'},
